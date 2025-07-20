@@ -1,0 +1,51 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+ENV/
+env/
+venv_windows/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Environments
+.env
+*.env
+
+# Project specific
+config/settings.json
+logs/
+*.log
+temp/
+*.tmp
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Credentials
+credentials.json
+techbook-analytics-*.json
+*.key
+*.pem
+
+# User settings
+.techzip/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+GITIGNORE_END < /dev/null

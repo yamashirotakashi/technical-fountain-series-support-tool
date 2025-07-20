@@ -1,0 +1,141 @@
+# グローバルルールの継承
+@../CLAUDE.md
+
+# プロジェクト名: 技術の泉シリーズ制作支援ツール
+最終更新: 2025-01-19
+
+## 🎯 プロジェクト概要
+- **目的**: 技術の泉シリーズの制作プロセスを自動化・効率化
+- **主要機能**: Re:VIEW形式から超原稿用紙（Word）形式への自動変換と配置
+- **プロジェクトキーワード**: `[techzip]`
+
+## 📋 ワークフロー
+1. **Nコード入力** - 処理対象のNコードを指定（カンマ、タブ、スペース、改行区切り対応）
+2. **Googleシート検索** - Nコードからリポジトリ名を取得
+3. **リポジトリ検索** - Google Drive内のリポジトリフォルダを特定
+4. **ZIP作成** - Re:VIEWフォルダをZIP化
+5. **アップロード** - 変換サービスにZIPをアップロード
+6. **メール監視** - 変換完了メールを自動監視
+7. **ダウンロード** - 変換済みファイルを取得
+8. **Word処理** - 1行目を削除して整形
+9. **ファイル配置** - 指定フォルダに最終成果物を配置
+
+## 🚀 起動方法
+
+### WSL環境
+```bash
+cd /mnt/c/Users/tky99/dev/technical-fountain-series-support-tool
+source venv/bin/activate
+python main.py
+```
+
+### Windows PowerShell（推奨）
+```powershell
+cd C:\Users\tky99\DEV\technical-fountain-series-support-tool
+.\run_windows.ps1
+```
+
+### ホットキー起動（Ctrl+Shift+I）
+
+#### PowerShell内でのホットキー
+```powershell
+# 永続的な設定（PowerShellプロファイルに追加）
+.\setup_hotkey.ps1
+
+# 一時的な設定（現在のセッションのみ）
+.\hotkey_quick_launch.ps1
+
+# 設定を削除する場合
+.\remove_hotkey.ps1
+```
+
+#### システム全体のグローバルホットキー（推奨）
+PowerShellが起動していなくても使用可能：
+
+##### スタートアップ登録方式（narouと同じ方式）
+```batch
+# インストール（Windows起動時に自動有効化）
+install_startup.bat
+
+# アンインストール
+uninstall_startup.bat
+```
+
+##### 手動実行方式
+```batch
+# AutoHotkeyを使用した一時的な設定
+test_hotkey_direct.bat
+```
+※要AutoHotkeyインストール
+
+## 🔧 設定ファイル
+
+### config/settings.json
+```json
+{
+    "google_sheet": {
+        "sheet_id": "17DKsMGQ6krbhY7GIcX0iaeN-y8HcGGVkXt3d4oOckyQ",
+        "credentials_path": "C:\\Users\\tky99\\dev\\techbookanalytics\\config\\techbook-analytics-aa03914c6639.json"
+    },
+    "paths": {
+        "git_base": "G:\\マイドライブ\\[git]",
+        "output_base": "G:\\.shortcut-targets-by-id\\0B6euJ_grVeOeMnJLU1IyUWgxeWM\\NP-IRD"
+    }
+}
+```
+
+### .env（要作成）
+```
+GMAIL_ADDRESS=yamashiro.takashi@gmail.com
+GMAIL_APP_PASSWORD=your_app_password_here
+```
+
+## ⚠️ 前提条件
+
+### Google Cloud設定
+1. **Google Sheets API** - 有効化が必要
+2. **サービスアカウント** - `techbook-analyzer-local-dev@techbook-analytics.iam.gserviceaccount.com`
+3. **シート共有** - サービスアカウントにGoogleシートの閲覧権限付与が必要
+
+### Gmail設定
+- **アプリパスワード** - 2段階認証を有効にしてアプリパスワードを生成
+- **IMAP有効化** - Gmail設定でIMAPを有効にする
+
+## 🛠️ トラブルシューティング
+
+### Google Sheets APIエラー
+```
+"Google Sheets API has not been used in project..."
+```
+→ Google Cloud ConsoleでSheets APIを有効化
+
+```
+"The caller does not have permission"
+```
+→ Googleシートをサービスアカウントと共有
+
+### メール監視エラー
+```
+"'ascii' codec can't encode characters..."
+```
+→ 修正済み。日本語件名の検索に対応
+
+## 📝 既知の問題と対応状況
+- ✅ Google Sheets API認証設定
+- ✅ 日本語メール件名のエンコーディング対応
+- ⏳ メール到着まで最大20分待機が必要
+
+## 🔄 開発メモ
+- PyQt5使用（WSL互換性のため）
+- 環境変数からの認証情報取得対応
+- UTF-8エンコーディング対応済み
+
+## 🚧 実装済み機能
+### リモートリポジトリ対応（2025-01-19実装）
+- **優先順位**: GitHubユーザー`irdtechbook`のリモートリポジトリから優先取得
+- **フォールバック**: リモート取得失敗時はローカルGoogle Drive（`G:\マイドライブ\[git]`）から取得
+- **実装内容**: 
+  1. GitRepositoryManagerクラスによるGitHub連携
+  2. ローカルキャッシュ機能（`~/.techzip/repo_cache`）
+  3. GUIからのリポジトリ設定管理（ツール→リポジトリ設定）
+  4. 環境変数`GITHUB_TOKEN`によるプライベートリポジトリ対応
