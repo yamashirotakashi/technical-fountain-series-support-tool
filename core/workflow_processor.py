@@ -22,7 +22,7 @@ class WorkflowProcessor(QObject):
     status_updated = pyqtSignal(str)  # status message
     confirmation_needed = pyqtSignal(str, str, object)  # title, message, callback
     folder_selection_needed = pyqtSignal(object, str, object)  # repo_path, repo_name, default_folder
-    file_paste_needed = pyqtSignal(list, str)  # processed_files, ncode
+    file_placement_confirmation_needed = pyqtSignal(str, int, object)  # honbun_folder_path, file_count, callback
     
     def __init__(self, email_address: str = None, email_password: str = None):
         """
@@ -52,6 +52,7 @@ class WorkflowProcessor(QObject):
         
         # ダイアログ結果の保存用
         self.dialog_result = None
+        self.file_placement_result = None
     
     @property
     def web_client(self):
@@ -194,41 +195,19 @@ class WorkflowProcessor(QObject):
             if not honbun_folder:
                 raise ValueError(f"本文フォルダの場所を特定できません: {ncode_folder}")
             
-            # 10. ファイル情報を安全に収集
-            self.emit_log("ファイル情報を収集中...", "INFO")
-            file_info_list = []
-            for file_path in processed_files:
-                try:
-                    if file_path.exists():
-                        file_info = {
-                            'name': file_path.name,
-                            'path': str(file_path),
-                            'size': file_path.stat().st_size
-                        }
-                    else:
-                        file_info = {
-                            'name': file_path.name,
-                            'path': str(file_path),
-                            'size': 0
-                        }
-                    file_info_list.append(file_info)
-                except Exception as e:
-                    self.emit_log(f"ファイル情報取得エラー {file_path.name}: {e}", "WARNING")
-                    file_info = {
-                        'name': file_path.name,
-                        'path': str(file_path),
-                        'size': 0
-                    }
-                    file_info_list.append(file_info)
+            # 10. 本文フォルダパス確認（要件2.6）
+            self.emit_log("本文フォルダパス確認を表示中...", "INFO")
+            confirmation_result = self._show_file_placement_confirmation(str(honbun_folder), len(processed_files))
             
-            # 11. ファイルペーストダイアログを表示
-            self.emit_log("ファイル選択ダイアログを表示中...", "INFO")
-            self.emit_log(f"処理済みファイル数: {len(file_info_list)}", "INFO")
-            paste_result = self._show_file_paste_dialog(file_info_list, n_code)
+            if not confirmation_result:
+                raise ValueError("ユーザーによって処理がキャンセルされました")
             
-            self.emit_log(f"ダイアログ結果: {paste_result}", "INFO")
-            if not paste_result:
-                raise ValueError("ユーザーによってキャンセルされました")
+            # 11. ファイル配置処理を実行
+            self.emit_log("ファイルを本文フォルダに配置中...", "INFO")
+            copy_result = self._copy_files_to_honbun_folder(processed_files, honbun_folder)
+            
+            if not copy_result:
+                raise ValueError("ファイル配置に失敗しました")
             
             self.emit_log(f"✓ {n_code} の処理が完了しました", "INFO")
         else:
@@ -257,50 +236,78 @@ class WorkflowProcessor(QObject):
         """ステータスを送信"""
         self.status_updated.emit(message)
     
-    def _show_file_paste_dialog(self, file_info_list: List[dict], ncode: str) -> bool:
+    def _copy_files_to_honbun_folder(self, processed_files: List[Path], honbun_folder: Path) -> bool:
         """
-        ファイルペーストダイアログを表示（同期的に）
+        処理済みファイルを本文フォルダに配置
         
         Args:
-            file_info_list: 処理済みファイル情報のリスト（辞書形式）
-            ncode: 対象のNコード
+            processed_files: 処理済みファイルのパスリスト
+            honbun_folder: 配置先の本文フォルダ
         
         Returns:
-            ダイアログが正常に完了した場合True
+            配置が成功した場合True
         """
-        self.emit_log(f"_show_file_paste_dialog開始: {ncode}", "INFO")
-        self.dialog_result = None
+        try:
+            import shutil
+            
+            # 本文フォルダが存在しない場合は作成
+            honbun_folder.mkdir(parents=True, exist_ok=True)
+            self.emit_log(f"本文フォルダを確認/作成: {honbun_folder}", "INFO")
+            
+            success_count = 0
+            for file_path in processed_files:
+                try:
+                    target_path = honbun_folder / file_path.name
+                    shutil.copy2(file_path, target_path)
+                    success_count += 1
+                    self.emit_log(f"ファイルコピー完了: {file_path.name}", "INFO")
+                except Exception as e:
+                    self.emit_log(f"ファイルコピーエラー {file_path.name}: {e}", "ERROR")
+            
+            self.emit_log(f"ファイル配置完了: {success_count}/{len(processed_files)} ファイル", "INFO")
+            return success_count > 0
+            
+        except Exception as e:
+            self.emit_log(f"ファイル配置処理エラー: {e}", "ERROR")
+            return False
+    
+    def _show_file_placement_confirmation(self, honbun_folder_path: str, file_count: int) -> bool:
+        """
+        ファイル配置確認ダイアログを表示（同期的に）
         
-        # シグナルを発行してダイアログ表示を要求
-        self.emit_log("file_paste_neededシグナルを発行中...", "INFO")
-        self.file_paste_needed.emit(file_info_list, ncode)
-        self.emit_log("file_paste_neededシグナルを発行しました", "INFO")
+        Args:
+            honbun_folder_path: 本文フォルダのパス
+            file_count: 配置するファイル数
+        
+        Returns:
+            ユーザーが承認した場合True
+        """
+        import time
+        
+        self.file_placement_result = None
+        
+        # シグナルを発行して確認ダイアログ表示を要求
+        self.file_placement_confirmation_needed.emit(honbun_folder_path, file_count, self.on_file_placement_confirmed)
         
         # 結果を待機（UIスレッドで処理されるまで）
-        timeout = 300  # 5分のタイムアウト
+        timeout = 60  # 1分のタイムアウト
         start_time = time.time()
-        wait_count = 0
-        while self.dialog_result is None and (time.time() - start_time) < timeout:
+        while self.file_placement_result is None and (time.time() - start_time) < timeout:
             time.sleep(0.1)
-            wait_count += 1
-            if wait_count % 50 == 0:  # 5秒ごとにログ出力
-                self.emit_log(f"ダイアログ応答待機中... ({wait_count * 0.1:.1f}秒)", "INFO")
             # GUIイベントループを処理するために必要
             from PyQt5.QtCore import QCoreApplication
             QCoreApplication.processEvents()
         
-        if self.dialog_result is None:
-            self.emit_log("ファイルペーストダイアログがタイムアウトしました", "ERROR")
+        if self.file_placement_result is None:
+            self.emit_log("ファイル配置確認がタイムアウトしました", "ERROR")
             return False
         
-        self.emit_log(f"ダイアログ完了: completed={self.dialog_result}", "INFO")
-        return self.dialog_result
+        return self.file_placement_result
     
-    @pyqtSlot(bool)
-    def on_file_paste_completed(self, success: bool):
-        """ファイルペーストダイアログの結果を受信"""
-        self.logger.info(f"ダイアログ結果受信: success={success}")
-        self.dialog_result = success
+    def on_file_placement_confirmed(self, confirmed: bool):
+        """ファイル配置確認の結果を受信"""
+        self.file_placement_result = confirmed
+        self.emit_log(f"ファイル配置確認結果: {confirmed}", "INFO")
     
     def _confirm_path(self, title: str, message: str) -> bool:
         """

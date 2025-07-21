@@ -205,3 +205,4 @@ class WordProcessor:
             else:
                 self.logger.error(f"親フォルダが存在しません: {ncode_folder}")
                 return None
+    
