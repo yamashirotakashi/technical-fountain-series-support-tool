@@ -4,7 +4,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import List, Optional, Callable
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
 
 from core.google_sheet import GoogleSheetClient
 from core.file_manager import FileManager
@@ -22,6 +22,7 @@ class WorkflowProcessor(QObject):
     status_updated = pyqtSignal(str)  # status message
     confirmation_needed = pyqtSignal(str, str, object)  # title, message, callback
     folder_selection_needed = pyqtSignal(object, str, object)  # repo_path, repo_name, default_folder
+    file_paste_needed = pyqtSignal(list, str)  # processed_files, ncode
     
     def __init__(self, email_address: str = None, email_password: str = None):
         """
@@ -48,6 +49,9 @@ class WorkflowProcessor(QObject):
         email_config = self.config.get_email_config()
         self.email_address = email_address or os.getenv('GMAIL_ADDRESS') or email_config.get('default_address')
         self.email_password = email_password or os.getenv('GMAIL_APP_PASSWORD')
+        
+        # ダイアログ結果の保存用
+        self.dialog_result = None
     
     @property
     def web_client(self):
@@ -172,37 +176,59 @@ class WorkflowProcessor(QObject):
             if not download_success:
                 raise ValueError("ファイルのダウンロードに失敗しました")
             
-            # 8. ZIPを展開
-            self.emit_log("ZIPファイルを展開中...", "INFO")
-            extract_dir = self.file_manager.temp_dir / f"{n_code}_extracted"
-            self.file_manager.extract_zip(download_path, extract_dir)
+            # 8. ZIPファイルを処理（展開 + 1行目削除）
+            self.emit_log("ZIPファイルを処理中...", "INFO")
+            processed_files = self.word_processor.process_zip_file(download_path)
             
-            # 9. Wordファイルを処理
-            self.emit_log("Wordファイルを処理中...", "INFO")
-            processed_count = self.word_processor.process_word_files(extract_dir)
-            self.emit_log(f"{processed_count}個のWordファイルを処理しました", "INFO")
+            if not processed_files:
+                raise ValueError("ZIPファイルの処理に失敗しました")
             
-            # 10. 出力先フォルダを確認
-            output_folder = self.file_manager.get_output_folder(n_code)
+            self.emit_log(f"{len(processed_files)}個のWordファイルを処理しました", "INFO")
             
-            # 出力先の確認
-            confirmed = self._confirm_path("出力先の確認", 
-                                         f"以下のフォルダに配置してよろしいですか？\n{output_folder}")
-            if not confirmed:
+            # 9. Nフォルダと本文フォルダの存在確認
+            ncode_folder = self.word_processor.find_ncode_folder(n_code)
+            if not ncode_folder:
+                raise ValueError(f"Nコードフォルダが見つかりません: {n_code}")
+            
+            honbun_folder = self.word_processor.find_honbun_folder(ncode_folder)
+            if not honbun_folder:
+                raise ValueError(f"本文フォルダの場所を特定できません: {ncode_folder}")
+            
+            # 10. ファイル情報を安全に収集
+            self.emit_log("ファイル情報を収集中...", "INFO")
+            file_info_list = []
+            for file_path in processed_files:
+                try:
+                    if file_path.exists():
+                        file_info = {
+                            'name': file_path.name,
+                            'path': str(file_path),
+                            'size': file_path.stat().st_size
+                        }
+                    else:
+                        file_info = {
+                            'name': file_path.name,
+                            'path': str(file_path),
+                            'size': 0
+                        }
+                    file_info_list.append(file_info)
+                except Exception as e:
+                    self.emit_log(f"ファイル情報取得エラー {file_path.name}: {e}", "WARNING")
+                    file_info = {
+                        'name': file_path.name,
+                        'path': str(file_path),
+                        'size': 0
+                    }
+                    file_info_list.append(file_info)
+            
+            # 11. ファイルペーストダイアログを表示
+            self.emit_log("ファイル選択ダイアログを表示中...", "INFO")
+            self.emit_log(f"処理済みファイル数: {len(file_info_list)}", "INFO")
+            paste_result = self._show_file_paste_dialog(file_info_list, n_code)
+            
+            self.emit_log(f"ダイアログ結果: {paste_result}", "INFO")
+            if not paste_result:
                 raise ValueError("ユーザーによってキャンセルされました")
-            
-            # 11. ファイルを配置
-            self.emit_log(f"ファイルを配置中: {output_folder}", "INFO")
-            output_folder.mkdir(parents=True, exist_ok=True)
-            
-            # すべてのファイルをコピー
-            import shutil
-            for file_path in extract_dir.rglob("*"):
-                if file_path.is_file():
-                    relative_path = file_path.relative_to(extract_dir)
-                    target_path = output_folder / relative_path
-                    target_path.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(file_path, target_path)
             
             self.emit_log(f"✓ {n_code} の処理が完了しました", "INFO")
         else:
@@ -230,6 +256,51 @@ class WorkflowProcessor(QObject):
     def emit_status(self, message: str):
         """ステータスを送信"""
         self.status_updated.emit(message)
+    
+    def _show_file_paste_dialog(self, file_info_list: List[dict], ncode: str) -> bool:
+        """
+        ファイルペーストダイアログを表示（同期的に）
+        
+        Args:
+            file_info_list: 処理済みファイル情報のリスト（辞書形式）
+            ncode: 対象のNコード
+        
+        Returns:
+            ダイアログが正常に完了した場合True
+        """
+        self.emit_log(f"_show_file_paste_dialog開始: {ncode}", "INFO")
+        self.dialog_result = None
+        
+        # シグナルを発行してダイアログ表示を要求
+        self.emit_log("file_paste_neededシグナルを発行中...", "INFO")
+        self.file_paste_needed.emit(file_info_list, ncode)
+        self.emit_log("file_paste_neededシグナルを発行しました", "INFO")
+        
+        # 結果を待機（UIスレッドで処理されるまで）
+        timeout = 300  # 5分のタイムアウト
+        start_time = time.time()
+        wait_count = 0
+        while self.dialog_result is None and (time.time() - start_time) < timeout:
+            time.sleep(0.1)
+            wait_count += 1
+            if wait_count % 50 == 0:  # 5秒ごとにログ出力
+                self.emit_log(f"ダイアログ応答待機中... ({wait_count * 0.1:.1f}秒)", "INFO")
+            # GUIイベントループを処理するために必要
+            from PyQt5.QtCore import QCoreApplication
+            QCoreApplication.processEvents()
+        
+        if self.dialog_result is None:
+            self.emit_log("ファイルペーストダイアログがタイムアウトしました", "ERROR")
+            return False
+        
+        self.emit_log(f"ダイアログ完了: completed={self.dialog_result}", "INFO")
+        return self.dialog_result
+    
+    @pyqtSlot(bool)
+    def on_file_paste_completed(self, success: bool):
+        """ファイルペーストダイアログの結果を受信"""
+        self.logger.info(f"ダイアログ結果受信: success={success}")
+        self.dialog_result = success
     
     def _confirm_path(self, title: str, message: str) -> bool:
         """

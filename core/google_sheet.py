@@ -1,5 +1,7 @@
 """Google Sheets連携モジュール"""
 import os
+import time
+import random
 from typing import Optional, Dict, Any
 from pathlib import Path
 
@@ -61,53 +63,110 @@ class GoogleSheetClient:
                 'repository_name': リポジトリ名（C列）
             }
         """
-        try:
-            self.logger.info(f"Nコード検索開始: {n_code}")
-            
-            # A列とC列のデータを取得（1000行まで）
-            range_name = 'A1:C1000'
-            result = self.service.spreadsheets().values().get(
-                spreadsheetId=self.sheet_id,
-                range=range_name
-            ).execute()
-            
-            values = result.get('values', [])
-            
-            if not values:
-                self.logger.warning("スプレッドシートにデータがありません")
-                return None
-            
-            # Nコードを検索
-            for row_idx, row in enumerate(values, start=1):
-                if row and len(row) > 0:
-                    # A列の値を確認
-                    cell_value = str(row[0]).strip().upper()
-                    if cell_value == n_code.upper():
-                        # C列の値を取得（存在する場合）
-                        repository_name = row[2] if len(row) > 2 else None
-                        
-                        if not repository_name:
-                            self.logger.warning(f"行 {row_idx} のC列にリポジトリ名がありません")
-                            return None
-                        
-                        result_dict = {
-                            'row': row_idx,
-                            'n_code': n_code,
-                            'repository_name': repository_name.strip()
-                        }
-                        
-                        self.logger.info(f"Nコード {n_code} を行 {row_idx} で発見: {repository_name}")
-                        return result_dict
-            
-            self.logger.warning(f"Nコード {n_code} が見つかりませんでした")
+        return self._execute_with_retry(self._search_n_code_impl, n_code)
+    
+    def _search_n_code_impl(self, n_code: str) -> Optional[Dict[str, Any]]:
+        """
+        Nコード検索の実装（リトライ対象）
+        """
+        self.logger.info(f"Nコード検索開始: {n_code}")
+        
+        # A列とC列のデータを取得（1000行まで）
+        range_name = 'A1:C1000'
+        result = self.service.spreadsheets().values().get(
+            spreadsheetId=self.sheet_id,
+            range=range_name
+        ).execute()
+        
+        values = result.get('values', [])
+        
+        if not values:
+            self.logger.warning("スプレッドシートにデータがありません")
             return None
-            
-        except HttpError as e:
-            self.logger.error(f"Google Sheets APIエラー: {e}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Nコード検索中にエラーが発生: {e}")
-            raise
+        
+        # Nコードを検索
+        for row_idx, row in enumerate(values, start=1):
+            if row and len(row) > 0:
+                # A列の値を確認
+                cell_value = str(row[0]).strip().upper()
+                if cell_value == n_code.upper():
+                    # C列の値を取得（存在する場合）
+                    repository_name = row[2] if len(row) > 2 else None
+                    
+                    if not repository_name:
+                        self.logger.warning(f"行 {row_idx} のC列にリポジトリ名がありません")
+                        return None
+                    
+                    result_dict = {
+                        'row': row_idx,
+                        'n_code': n_code,
+                        'repository_name': repository_name.strip()
+                    }
+                    
+                    self.logger.info(f"Nコード {n_code} を行 {row_idx} で発見: {repository_name}")
+                    return result_dict
+        
+        self.logger.warning(f"Nコード {n_code} が見つかりませんでした")
+        return None
+    
+    def _execute_with_retry(self, func, *args, max_retries: int = 3, **kwargs):
+        """
+        指数バックオフでリトライ実行
+        
+        Args:
+            func: 実行する関数
+            max_retries: 最大リトライ回数
+            *args, **kwargs: 関数に渡す引数
+        
+        Returns:
+            関数の実行結果
+        """
+        for attempt in range(max_retries + 1):
+            try:
+                return func(*args, **kwargs)
+                
+            except HttpError as e:
+                # リトライ可能なエラーかチェック
+                if self._is_retryable_error(e) and attempt < max_retries:
+                    # 指数バックオフで待機時間を計算（ジッターを追加）
+                    wait_time = (2 ** attempt) + random.uniform(0, 1)
+                    self.logger.warning(
+                        f"Google Sheets APIエラー (試行 {attempt + 1}/{max_retries + 1}): {e.resp.status} - "
+                        f"{wait_time:.2f}秒後にリトライします"
+                    )
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    # リトライ不可能なエラーまたは最大リトライ回数に達した場合
+                    self.logger.error(f"Google Sheets APIエラー (最終): {e}")
+                    raise
+                    
+            except Exception as e:
+                # HttpError以外のエラーはリトライしない
+                self.logger.error(f"予期しないエラー: {e}")
+                raise
+    
+    def _is_retryable_error(self, error: HttpError) -> bool:
+        """
+        リトライ可能なエラーかどうかを判定
+        
+        Args:
+            error: HttpErrorオブジェクト
+        
+        Returns:
+            リトライ可能な場合True
+        """
+        # リトライ可能なHTTPステータスコード
+        retryable_codes = {
+            429,  # Too Many Requests
+            500,  # Internal Server Error
+            502,  # Bad Gateway
+            503,  # Service Unavailable
+            504,  # Gateway Timeout
+        }
+        
+        status_code = error.resp.status if error.resp else None
+        return status_code in retryable_codes
     
     def get_repository_name(self, n_code: str) -> Optional[str]:
         """
@@ -130,10 +189,10 @@ class GoogleSheetClient:
             接続が成功した場合True
         """
         try:
-            # スプレッドシートのメタデータを取得してテスト
-            sheet_metadata = self.service.spreadsheets().get(
-                spreadsheetId=self.sheet_id
-            ).execute()
+            # リトライ機能付きで接続テストを実行
+            sheet_metadata = self._execute_with_retry(
+                lambda: self.service.spreadsheets().get(spreadsheetId=self.sheet_id).execute()
+            )
             
             sheet_title = sheet_metadata.get('properties', {}).get('title', 'Unknown')
             self.logger.info(f"スプレッドシートに接続成功: {sheet_title}")

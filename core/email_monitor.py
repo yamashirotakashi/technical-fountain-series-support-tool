@@ -119,19 +119,24 @@ class EmailMonitor:
                                 # 件名を確認
                                 subject = msg.get('Subject', '')
                                 if subject:
-                                    # 件名をデコード
-                                    decoded_subject = str(email.header.make_header(email.header.decode_header(subject)))
-                                    self.logger.info(f"件名: {decoded_subject}")
-                                    
-                                    # 件名パターンと一致するか確認
-                                    if subject_pattern in decoded_subject:
-                                        self.logger.info(f"該当するメールを発見: ID {email_id}, 件名: {decoded_subject}")
+                                    try:
+                                        # 件名をデコード
+                                        decoded_subject = str(email.header.make_header(email.header.decode_header(subject)))
+                                        self.logger.info(f"件名: {decoded_subject}")
                                         
-                                        # URLを抽出
-                                        download_url = self._extract_download_url(msg)
-                                        if download_url:
-                                            self.logger.info(f"ダウンロードURLを取得: {download_url}")
-                                            return download_url
+                                        # 件名パターンと一致するか確認
+                                        if subject_pattern in decoded_subject:
+                                            self.logger.info(f"該当するメールを発見: ID {email_id}, 件名: {decoded_subject}")
+                                            
+                                            # URLを抽出
+                                            download_url = self._extract_download_url(msg)
+                                            if download_url:
+                                                self.logger.info(f"ダウンロードURLを取得: {download_url}")
+                                                return download_url
+                                    except Exception as decode_error:
+                                        self.logger.warning(f"件名デコードエラー (ID {email_id}): {decode_error}")
+                                        # デコードエラーの場合はスキップして次へ
+                                        continue
                 
                 # 次のチェックまで待機
                 remaining = (end_time - datetime.now()).total_seconds()
@@ -168,12 +173,18 @@ class EmailMonitor:
                     if part.get_content_type() == "text/plain":
                         payload = part.get_payload(decode=True)
                         if payload:
-                            body = payload.decode('utf-8', errors='ignore')
-                            break
+                            # 複数のエンコーディングを試行
+                            body = self._safe_decode_payload(payload)
+                            if body:
+                                break
             else:
                 payload = msg.get_payload(decode=True)
                 if payload:
-                    body = payload.decode('utf-8', errors='ignore')
+                    body = self._safe_decode_payload(payload)
+            
+            if not body:
+                self.logger.warning("メール本文を取得できませんでした")
+                return None
             
             # URLパターンを検索
             url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+\.zip'
@@ -198,6 +209,32 @@ class EmailMonitor:
         except Exception as e:
             self.logger.error(f"URL抽出中にエラー: {e}")
             return None
+    
+    def _safe_decode_payload(self, payload: bytes) -> str:
+        """
+        ペイロードを安全にデコード
+        
+        Args:
+            payload: バイトデータ
+        
+        Returns:
+            デコードされた文字列
+        """
+        # 試行するエンコーディングリスト
+        encodings = ['utf-8', 'iso-2022-jp', 'shift_jis', 'euc-jp', 'ascii']
+        
+        for encoding in encodings:
+            try:
+                return payload.decode(encoding)
+            except (UnicodeDecodeError, LookupError):
+                continue
+        
+        # すべて失敗した場合はエラーを無視してデコード
+        try:
+            return payload.decode('utf-8', errors='ignore')
+        except Exception:
+            self.logger.warning("ペイロードのデコードに失敗しました")
+            return ""
     
     def close(self):
         """接続を閉じる"""

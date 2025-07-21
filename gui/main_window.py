@@ -9,8 +9,11 @@ from gui.components.input_panel import InputPanel
 from gui.components.log_panel import LogPanel
 from gui.components.progress_bar import ProgressPanel
 from gui.dialogs import FolderSelectorDialog
+# from gui.dialogs.file_paste_dialog import FilePasteDialog  # 一時的に無効化
+# from gui.dialogs.file_paste_dialog import FilePasteWorker  # 後のフェーズで使用予定
 from core.workflow_processor import WorkflowProcessor
 from utils.logger import get_logger
+from pathlib import Path
 
 
 class ProcessWorker(QThread):
@@ -21,6 +24,8 @@ class ProcessWorker(QThread):
     status_updated = pyqtSignal(str)
     confirmation_needed = pyqtSignal(str, str)
     folder_selection_needed = pyqtSignal(object, str, object)  # repo_path, repo_name, default_folder
+    file_paste_needed = pyqtSignal(list, str)  # processed_files, ncode
+    file_paste_completed = pyqtSignal(bool)  # success
     finished = pyqtSignal()
     
     def __init__(self, n_codes, email_password=None):
@@ -41,6 +46,8 @@ class ProcessWorker(QThread):
             self.workflow_processor.progress_updated.connect(self.progress_updated.emit)
             self.workflow_processor.status_updated.connect(self.status_updated.emit)
             self.workflow_processor.folder_selection_needed.connect(self.folder_selection_needed.emit)
+            self.workflow_processor.file_paste_needed.connect(self.file_paste_needed.emit)
+            self.file_paste_completed.connect(self.workflow_processor.on_file_paste_completed)
             
             # 処理を実行
             self.workflow_processor.process_n_codes(self.n_codes)
@@ -219,6 +226,8 @@ class MainWindow(QMainWindow):
         self.worker_thread.log_message.connect(self.log_panel.append_log)
         self.worker_thread.status_updated.connect(self.progress_panel.update_status)
         self.worker_thread.folder_selection_needed.connect(self.on_folder_selection_needed)
+        self.worker_thread.file_paste_needed.connect(self.on_file_paste_needed)
+        self.worker_thread.file_paste_completed.connect(self.worker_thread.file_paste_completed.emit)
         self.worker_thread.finished.connect(self.on_processing_finished)
         self.worker_thread.start()
         
@@ -304,6 +313,48 @@ class MainWindow(QMainWindow):
             self.log_panel.append_log("フォルダ選択がキャンセルされました", "WARNING")
             if self.worker_thread and self.worker_thread.workflow_processor:
                 self.worker_thread.workflow_processor.set_selected_work_folder(None)
+    
+    @pyqtSlot(list, str)
+    def on_file_paste_needed(self, file_info_list, ncode):
+        """ファイルペースト確認（QMessageBox版）"""
+        try:
+            self.log_panel.append_log(f"ファイルペースト確認: {ncode}, ファイル数: {len(file_info_list)}", "INFO")
+            
+            # ファイル一覧を作成
+            file_names = [info['name'] for info in file_info_list]
+            message = f"N{ncode}の本文フォルダに{len(file_names)}個のファイルをペーストしますか?\n\n"
+            message += "\n".join([f"• {name}" for name in file_names[:10]])  # 最大10個まで表示
+            
+            if len(file_names) > 10:
+                message += f"\n...他{len(file_names) - 10}個"
+            
+            # 確認ダイアログ
+            reply = QMessageBox.question(
+                self,
+                "ファイルペースト確認",
+                message,
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            
+            success = reply == QMessageBox.Yes
+            
+            if success:
+                # TODO: ここで実際のファイルペースト処理を実装
+                self.log_panel.append_log("ファイルペーストが承認されました", "INFO")
+                QMessageBox.information(self, "完了", "ファイルペーストが完了しました。\n（実際の処理は次のフェーズで実装予定）")
+            else:
+                self.log_panel.append_log("ファイルペーストがキャンセルされました", "INFO")
+            
+            # 結果をシグナルで送信
+            self.worker_thread.file_paste_completed.emit(success)
+            self.log_panel.append_log(f"結果送信: {success}", "INFO")
+                
+        except Exception as e:
+            self.log_panel.append_log(f"ファイルペースト確認エラー: {e}", "ERROR")
+            import traceback
+            self.log_panel.append_log(f"エラー詳細: {traceback.format_exc()}", "ERROR")
+            self.worker_thread.file_paste_completed.emit(False)
     
     def closeEvent(self, event):
         """ウィンドウを閉じる時の処理"""
