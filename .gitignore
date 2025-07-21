@@ -49,3 +49,4 @@ build/
 dist/
 *.egg-info/
 GITIGNORE_END < /dev/null
+test_venv/

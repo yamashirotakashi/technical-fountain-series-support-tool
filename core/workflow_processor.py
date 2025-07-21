@@ -22,7 +22,7 @@ class WorkflowProcessor(QObject):
     status_updated = pyqtSignal(str)  # status message
     confirmation_needed = pyqtSignal(str, str, object)  # title, message, callback
     folder_selection_needed = pyqtSignal(object, str, object)  # repo_path, repo_name, default_folder
-    file_placement_confirmation_needed = pyqtSignal(str, int, object)  # honbun_folder_path, file_count, callback
+    file_placement_confirmation_needed = pyqtSignal(str, list, object)  # honbun_folder_path, file_list, callback
     
     def __init__(self, email_address: str = None, email_password: str = None):
         """
@@ -197,14 +197,14 @@ class WorkflowProcessor(QObject):
             
             # 10. 本文フォルダパス確認（要件2.6）
             self.emit_log("本文フォルダパス確認を表示中...", "INFO")
-            confirmation_result = self._show_file_placement_confirmation(str(honbun_folder), len(processed_files))
+            selected_files = self._show_file_placement_confirmation(str(honbun_folder), processed_files)
             
-            if not confirmation_result:
+            if not selected_files:
                 raise ValueError("ユーザーによって処理がキャンセルされました")
             
             # 11. ファイル配置処理を実行
-            self.emit_log("ファイルを本文フォルダに配置中...", "INFO")
-            copy_result = self._copy_files_to_honbun_folder(processed_files, honbun_folder)
+            self.emit_log(f"選択された{len(selected_files)}個のファイルを本文フォルダに配置中...", "INFO")
+            copy_result = self._copy_files_to_honbun_folder(selected_files, honbun_folder)
             
             if not copy_result:
                 raise ValueError("ファイル配置に失敗しました")
@@ -271,23 +271,23 @@ class WorkflowProcessor(QObject):
             self.emit_log(f"ファイル配置処理エラー: {e}", "ERROR")
             return False
     
-    def _show_file_placement_confirmation(self, honbun_folder_path: str, file_count: int) -> bool:
+    def _show_file_placement_confirmation(self, honbun_folder_path: str, file_list: List[Path]) -> List[Path]:
         """
         ファイル配置確認ダイアログを表示（同期的に）
         
         Args:
             honbun_folder_path: 本文フォルダのパス
-            file_count: 配置するファイル数
+            file_list: 処理済みファイルのリスト
         
         Returns:
-            ユーザーが承認した場合True
+            選択されたファイルのリスト（キャンセルの場合は空リスト）
         """
         import time
         
         self.file_placement_result = None
         
         # シグナルを発行して確認ダイアログ表示を要求
-        self.file_placement_confirmation_needed.emit(honbun_folder_path, file_count, self.on_file_placement_confirmed)
+        self.file_placement_confirmation_needed.emit(honbun_folder_path, file_list, self.on_file_placement_confirmed)
         
         # 結果を待機（UIスレッドで処理されるまで）
         timeout = 60  # 1分のタイムアウト
@@ -300,14 +300,14 @@ class WorkflowProcessor(QObject):
         
         if self.file_placement_result is None:
             self.emit_log("ファイル配置確認がタイムアウトしました", "ERROR")
-            return False
+            return []
         
-        return self.file_placement_result
+        return self.file_placement_result if self.file_placement_result else []
     
-    def on_file_placement_confirmed(self, confirmed: bool):
+    def on_file_placement_confirmed(self, selected_files: List[Path]):
         """ファイル配置確認の結果を受信"""
-        self.file_placement_result = confirmed
-        self.emit_log(f"ファイル配置確認結果: {confirmed}", "INFO")
+        self.file_placement_result = selected_files
+        self.emit_log(f"ファイル配置確認結果: {len(selected_files)}個のファイルを選択", "INFO")
     
     def _confirm_path(self, title: str, message: str) -> bool:
         """

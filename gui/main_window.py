@@ -9,6 +9,7 @@ from gui.components.input_panel import InputPanel
 from gui.components.log_panel import LogPanel
 from gui.components.progress_bar import ProgressPanel
 from gui.dialogs import FolderSelectorDialog
+from gui.dialogs.simple_file_selector_dialog import SimpleFileSelectorDialog
 from core.workflow_processor import WorkflowProcessor
 from utils.logger import get_logger
 from pathlib import Path
@@ -22,7 +23,7 @@ class ProcessWorker(QThread):
     status_updated = pyqtSignal(str)
     confirmation_needed = pyqtSignal(str, str)
     folder_selection_needed = pyqtSignal(object, str, object)  # repo_path, repo_name, default_folder
-    file_placement_confirmation_needed = pyqtSignal(str, int, object)  # honbun_folder_path, file_count, callback
+    file_placement_confirmation_needed = pyqtSignal(str, list, object)  # honbun_folder_path, file_list, callback
     finished = pyqtSignal()
     
     def __init__(self, n_codes, email_password=None):
@@ -309,31 +310,56 @@ class MainWindow(QMainWindow):
             if self.worker_thread and self.worker_thread.workflow_processor:
                 self.worker_thread.workflow_processor.set_selected_work_folder(None)
     
-    @pyqtSlot(str, int, object)
-    def on_file_placement_confirmation_needed(self, honbun_folder_path, file_count, callback):
+    @pyqtSlot(str, list, object)
+    def on_file_placement_confirmation_needed(self, honbun_folder_path, file_list, callback):
         """ファイル配置確認ダイアログを表示"""
         try:
+            # ファイル名のリストを作成
+            file_names = [f.name for f in file_list[:10]]  # 最大10個まで表示
+            if len(file_list) > 10:
+                file_names.append(f"... 他 {len(file_list) - 10} ファイル")
+            file_list_str = "\n".join([f"• {name}" for name in file_names])
+            
+            # 最初の確認ダイアログ
             reply = QMessageBox.question(
                 self,
                 "ファイル配置確認",
-                f"以下のフォルダに{file_count}個のWordファイル（1行目削除済み）を配置します。\n\n"
+                f"以下のフォルダに{len(file_list)}個のWordファイル（1行目削除済み）を配置します。\n\n"
                 f"配置先: {honbun_folder_path}\n\n"
-                f"実行しますか？",
-                QMessageBox.Yes | QMessageBox.No,
+                f"ファイル:\n{file_list_str}\n\n"
+                f"全てのファイルを配置しますか？",
+                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
                 QMessageBox.Yes
             )
             
-            confirmed = (reply == QMessageBox.Yes)
-            self.log_panel.append_log(f"ファイル配置確認: {'承認' if confirmed else 'キャンセル'}", "INFO")
+            if reply == QMessageBox.Cancel:
+                self.log_panel.append_log("ファイル配置がキャンセルされました", "INFO")
+                if callback:
+                    callback([])
+                return
             
-            # コールバックを呼び出し
-            if callback:
-                callback(confirmed)
+            if reply == QMessageBox.No:
+                # 一部ファイルのみ選択
+                dialog = SimpleFileSelectorDialog(file_list, self)
+                if dialog.exec_() == QMessageBox.Accepted:
+                    selected_files = dialog.get_selected_files()
+                    self.log_panel.append_log(f"ファイル選択: {len(selected_files)}個を選択", "INFO")
+                    if callback:
+                        callback(selected_files)
+                else:
+                    self.log_panel.append_log("ファイル選択がキャンセルされました", "INFO")
+                    if callback:
+                        callback([])
+            else:
+                # 全ファイルを配置
+                self.log_panel.append_log(f"ファイル配置確認: 全{len(file_list)}個のファイルを配置", "INFO")
+                if callback:
+                    callback(file_list)
                 
         except Exception as e:
             self.log_panel.append_log(f"確認ダイアログエラー: {e}", "ERROR")
             if callback:
-                callback(False)
+                callback([])
     
     def closeEvent(self, event):
         """ウィンドウを閉じる時の処理"""
