@@ -1,0 +1,45 @@
+{
+  "timestamp": "2025-07-23T16:52:58.668877",
+  "api_base_url": "http://sd001.nextpublishing.jp/rapture",
+  "workflow_steps": [
+    {
+      "step_name": "ファイル確認",
+      "timestamp": "2025-07-23T16:52:58.671336",
+      "success": true,
+      "message": "ファイルサイズ: 0.00 MB",
+      "details": {}
+    },
+    {
+      "step_name": "アップロード",
+      "timestamp": "2025-07-23T16:52:58.914607",
+      "success": true,
+      "message": "アップロード成功 (所要時間: 0.2秒)",
+      "details": {
+        "jobid": "6d87b081f5f4e82e",
+        "upload_time_sec": 0.2417747974395752,
+        "file_size_mb": 0.0005197525024414062
+      }
+    },
+    {
+      "step_name": "ステータス確認",
+      "timestamp": "2025-07-23T16:52:59.078345",
+      "success": false,
+      "message": "変換処理が失敗しました",
+      "details": {
+        "status": "failed",
+        "errors": [
+          "原稿ディレクトリが見つかりません"
+        ]
+      }
+    }
+  ],
+  "test_case": "failure",
+  "test_name": "失敗ケース",
+  "test_file": "/mnt/c/Users/tky99/DEV/technical-fountain-series-support-tool/run_direct.zip",
+  "summary": {
+    "total_steps": 3,
+    "successful_steps": 2,
+    "failed_steps": 1,
+    "success_rate": "66.7%"
+  }
+}

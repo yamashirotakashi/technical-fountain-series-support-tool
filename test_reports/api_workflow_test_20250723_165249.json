@@ -1,0 +1,72 @@
+{
+  "timestamp": "2025-07-23T16:52:29.694017",
+  "api_base_url": "http://sd001.nextpublishing.jp/rapture",
+  "workflow_steps": [
+    {
+      "step_name": "ファイル確認",
+      "timestamp": "2025-07-23T16:52:29.696508",
+      "success": true,
+      "message": "ファイルサイズ: 5.73 MB",
+      "details": {}
+    },
+    {
+      "step_name": "アップロード",
+      "timestamp": "2025-07-23T16:52:48.971847",
+      "success": true,
+      "message": "アップロード成功 (所要時間: 19.3秒)",
+      "details": {
+        "jobid": "1e2bf9bd2ea2d65b",
+        "upload_time_sec": 19.273324966430664,
+        "file_size_mb": 5.726064682006836
+      }
+    },
+    {
+      "step_name": "ステータス確認",
+      "timestamp": "2025-07-23T16:52:49.172565",
+      "success": true,
+      "message": "変換処理が成功しました（警告あり）",
+      "details": {
+        "status": "completed",
+        "result": "success",
+        "output": "\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m !!! CHAPS is obsoleted. please use catalog.yml.\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap1.re:22: deprecated ID: `/` in `chap1/01_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap1.re:58: deprecated ID: `/` in `chap1/01_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap1.re:65: deprecated ID: `/` in `chap1/01_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap1.re:78: deprecated ID: `/` in `chap1/01_04`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap1.re:159: deprecated ID: `/` in `chap1/01_05`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap10.re:44: deprecated ID: `/` in `chap10/10_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap10.re:53: deprecated ID: `/` in `chap10/10_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap10.re:189: deprecated ID: `/` in `chap10/10_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap11.re:228: deprecated ID: `/` in `chap11/11_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap12.re:104: deprecated ID: `/` in `chap12/12_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap12.re:299: deprecated ID: `/` in `chap12/12_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap12.re:314: deprecated ID: `/` in `chap12/12_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap12.re:319: deprecated ID: `/` in `chap12/12_04`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap2.re:50: deprecated ID: `/` in `chap2/02_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap2.re:59: deprecated ID: `/` in `chap2/02_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap2.re:68: deprecated ID: `/` in `chap2/02_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap2.re:77: deprecated ID: `/` in `chap2/02_04`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap3.re:16: deprecated ID: `/` in `chap3/03_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap3.re:72: deprecated ID: `/` in `chap3/03_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap3.re:79: deprecated ID: `/` in `chap3/03_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap4.re:58: deprecated ID: `/` in `chap4/04_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap4.re:93: deprecated ID: `/` in `chap4/04_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap4.re:100: deprecated ID: `/` in `chap4/04_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap4.re:109: deprecated ID: `/` in `chap4/04_04`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap4.re:159: deprecated ID: `/` in `chap4/04_05`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap4.re:164: deprecated ID: `/` in `chap4/04_06`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap4.re:186: deprecated ID: `/` in `chap4/04_07`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap5.re:15: deprecated ID: `/` in `chap5/05_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap5.re:24: deprecated ID: `/` in `chap5/05_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap5.re:33: deprecated ID: `/` in `chap5/05_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap5.re:40: deprecated ID: `/` in `chap5/05_04`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap5.re:49: deprecated ID: `/` in `chap5/05_05`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap5.re:62: deprecated ID: `/` in `chap5/05_06`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap5.re:77: deprecated ID: `/` in `chap5/05_07`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:39: deprecated ID: `/` in `chap6/06_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:44: deprecated ID: `/` in `chap6/06_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:49: deprecated ID: `/` in `chap6/06_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:54: deprecated ID: `/` in `chap6/06_04`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:59: deprecated ID: `/` in `chap6/06_05`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:68: deprecated ID: `/` in `chap6/06_06`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:73: deprecated ID: `/` in `chap6/06_07`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:84: deprecated ID: `/` in `chap6/06_08`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:89: deprecated ID: `/` in `chap6/06_09`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:102: deprecated ID: `/` in `chap6/06_10`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:107: deprecated ID: `/` in `chap6/06_11`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:112: deprecated ID: `/` in `chap6/06_12`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:117: deprecated ID: `/` in `chap6/06_13`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:122: deprecated ID: `/` in `chap6/06_14`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:131: deprecated ID: `/` in `chap6/06_15`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:136: deprecated ID: `/` in `chap6/06_16`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:145: deprecated ID: `/` in `chap6/06_17`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:148: deprecated ID: `/` in `chap6/06_18`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap6.re:153: deprecated ID: `/` in `chap6/06_19`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap7.re:304: deprecated ID: `/` in `chap7/07_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap7.re:340: deprecated ID: `/` in `chap7/07_99_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap7.re:345: deprecated ID: `/` in `chap7/07_99_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap8.re:30: deprecated ID: `/` in `chap8/08_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap8.re:37: deprecated ID: `/` in `chap8/08_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap8.re:44: deprecated ID: `/` in `chap8/08_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap8.re:49: deprecated ID: `/` in `chap8/08_04`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap8.re:52: deprecated ID: `/` in `chap8/08_05`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap9.re:20: deprecated ID: `/` in `chap9/09_01`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap9.re:25: deprecated ID: `/` in `chap9/09_02`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap9.re:32: deprecated ID: `/` in `chap9/09_03`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap9.re:39: deprecated ID: `/` in `chap9/09_04`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m chap9.re:44: deprecated ID: `/` in `chap9/09_05`\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m !!! PREDEF is obsoleted. please use catalog.yml.\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m !!! POSTDEF is obsoleted. please use catalog.yml.\n\u001b[33m⚠\u001b[0m \u001b[33mWARN\u001b[0m image not bound: chap1/01_01",
+        "download_url": "http://sd001.nextpublishing.jp/rapture/api/download/1e2bf9bd2ea2d65b",
+        "attempts": 1,
+        "total_wait_time_sec": 10
+      }
+    },
+    {
+      "step_name": "ダウンロード",
+      "timestamp": "2025-07-23T16:52:49.749041",
+      "success": true,
+      "message": "ダウンロード成功 (所要時間: 0.6秒)",
+      "details": {
+        "download_path": "/mnt/c/Users/tky99/dev/technical-fountain-series-support-tool/test_downloads/converted_1e2bf9bd2ea2d65b_20250723_165249.zip",
+        "file_size_mb": "4.67",
+        "download_time_sec": 0.5611584186553955,
+        "total_files": 12,
+        "docx_files": 12,
+        "file_list": [
+          "chap1.docx",
+          "chap10.docx",
+          "chap11.docx",
+          "chap12.docx",
+          "chap2.docx",
+          "chap3.docx",
+          "chap4.docx",
+          "chap5.docx",
+          "chap6.docx",
+          "chap7.docx"
+        ]
+      }
+    }
+  ],
+  "test_case": "partial",
+  "test_name": "一部成功ケース（警告あり）",
+  "test_file": "/mnt/c/Users/tky99/DEV/technical-fountain-series-support-tool/ReVIEW error 2.zip",
+  "summary": {
+    "total_steps": 4,
+    "successful_steps": 4,
+    "failed_steps": 0,
+    "success_rate": "100.0%"
+  }
+}

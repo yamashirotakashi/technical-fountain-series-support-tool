@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-07-23T15:29:39.141572",
+  "api_base_url": "http://sd001.nextpublishing.jp/rapture",
+  "test_file": "G:\\マイドライブ\\[git]\\n2279-python-sbrl\\ReVIEW.zip",
+  "workflow_steps": [
+    {
+      "step_name": "ファイル存在確認",
+      "timestamp": "2025-07-23T15:29:39.141737",
+      "success": false,
+      "message": "テストファイルが見つかりません: G:\\マイドライブ\\[git]\\n2279-python-sbrl\\ReVIEW.zip",
+      "details": {}
+    }
+  ],
+  "summary": {
+    "total_steps": 1,
+    "successful_steps": 0,
+    "failed_steps": 1,
+    "success_rate": "0.0%"
+  }
+}

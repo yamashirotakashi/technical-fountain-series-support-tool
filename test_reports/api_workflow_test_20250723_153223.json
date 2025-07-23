@@ -1,0 +1,69 @@
+{
+  "timestamp": "2025-07-23T15:32:03.806518",
+  "api_base_url": "http://sd001.nextpublishing.jp/rapture",
+  "test_file": "/mnt/c/Users/tky99/DEV/technical-fountain-series-support-tool/ReVIEW.zip",
+  "workflow_steps": [
+    {
+      "step_name": "ファイル確認",
+      "timestamp": "2025-07-23T15:32:03.809070",
+      "success": true,
+      "message": "ファイルサイズ: 5.83 MB",
+      "details": {}
+    },
+    {
+      "step_name": "アップロード",
+      "timestamp": "2025-07-23T15:32:23.158538",
+      "success": true,
+      "message": "アップロード成功 (所要時間: 19.3秒)",
+      "details": {
+        "jobid": "7c6b1b52834173c2",
+        "upload_time_sec": 19.337036848068237,
+        "file_size_mb": 5.82936954498291
+      }
+    },
+    {
+      "step_name": "ステータス確認",
+      "timestamp": "2025-07-23T15:32:23.327868",
+      "success": true,
+      "message": "変換処理が正常に完了しました",
+      "details": {
+        "status": "completed",
+        "result": "success",
+        "download_url": "http://sd001.nextpublishing.jp/rapture/api/download/7c6b1b52834173c2",
+        "attempts": 1,
+        "total_wait_time_sec": 10
+      }
+    },
+    {
+      "step_name": "ダウンロード",
+      "timestamp": "2025-07-23T15:32:23.982002",
+      "success": true,
+      "message": "ダウンロード成功 (所要時間: 0.6秒)",
+      "details": {
+        "download_path": "/mnt/c/Users/tky99/dev/technical-fountain-series-support-tool/test_downloads/converted_7c6b1b52834173c2_20250723_153223.zip",
+        "file_size_mb": "4.77",
+        "download_time_sec": 0.6381900310516357,
+        "total_files": 12,
+        "docx_files": 12,
+        "file_list": [
+          "chap1.docx",
+          "chap10.docx",
+          "chap11.docx",
+          "chap12.docx",
+          "chap2.docx",
+          "chap3.docx",
+          "chap4.docx",
+          "chap5.docx",
+          "chap6.docx",
+          "chap7.docx"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "total_steps": 4,
+    "successful_steps": 4,
+    "failed_steps": 0,
+    "success_rate": "100.0%"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "timestamp": "2025-07-23T16:59:10.871607",
+  "api_base_url": "http://sd001.nextpublishing.jp/rapture",
+  "workflow_steps": [
+    {
+      "step_name": "ファイル確認",
+      "timestamp": "2025-07-23T16:59:10.873388",
+      "success": true,
+      "message": "ファイルサイズ: 19.82 MB",
+      "details": {}
+    },
+    {
+      "step_name": "アップロード",
+      "timestamp": "2025-07-23T16:59:50.378148",
+      "success": true,
+      "message": "アップロード成功 (所要時間: 39.5秒)",
+      "details": {
+        "jobid": "5d543b1a4f228d55",
+        "upload_time_sec": 39.49297308921814,
+        "file_size_mb": 19.823217391967773
+      }
+    },
+    {
+      "step_name": "ステータス確認",
+      "timestamp": "2025-07-23T16:59:50.538739",
+      "success": true,
+      "message": "変換処理が正常に完了しました（警告なし）",
+      "details": {
+        "status": "completed",
+        "result": "success",
+        "output": "警告メッセージなし",
+        "download_url": "http://sd001.nextpublishing.jp/rapture/api/download/5d543b1a4f228d55",
+        "attempts": 1,
+        "total_wait_time_sec": 10
+      }
+    },
+    {
+      "step_name": "ダウンロード",
+      "timestamp": "2025-07-23T16:59:51.088612",
+      "success": true,
+      "message": "ダウンロード成功 (所要時間: 0.5秒)",
+      "details": {
+        "download_path": "/mnt/c/Users/tky99/dev/technical-fountain-series-support-tool/test_downloads/converted_5d543b1a4f228d55_20250723_165950.zip",
+        "file_size_mb": "3.04",
+        "download_time_sec": 0.5352263450622559,
+        "total_files": 11,
+        "docx_files": 11,
+        "file_list": [
+          "0.preface.docx",
+          "1.explanation_of_how_to_learn.docx",
+          "10.postface.docx",
+          "2.explanation_of_application.docx",
+          "3.explanation_of_line_messaging_api.docx",
+          "4.explanation_of_rust_sql_library.docx",
+          "5.explanation_of_architecture.docx",
+          "6.explanation_of_how_to_build_architecture.docx",
+          "7.explanation_of_how_to_build_dev_environment.docx",
+          "8.explanation_of_features.docx"
+        ]
+      }
+    }
+  ],
+  "test_case": "success",
+  "test_name": "成功ケース（警告なし）",
+  "test_file": "/mnt/c/Users/tky99/DEV/articles.zip",
+  "summary": {
+    "total_steps": 4,
+    "successful_steps": 4,
+    "failed_steps": 0,
+    "success_rate": "100.0%"
+  }
+}

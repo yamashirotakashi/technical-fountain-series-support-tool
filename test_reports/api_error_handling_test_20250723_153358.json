@@ -1,0 +1,54 @@
+{
+  "timestamp": "2025-07-23T15:33:39.431203",
+  "api_base_url": "http://sd001.nextpublishing.jp/rapture",
+  "test_file": "/mnt/c/Users/tky99/DEV/technical-fountain-series-support-tool/ReVIEW error.zip",
+  "error_tests": [
+    {
+      "test_name": "エラーファイルアップロード",
+      "timestamp": "2025-07-23T15:33:58.278196",
+      "success": true,
+      "message": "アップロード成功 (所要時間: 18.8秒)",
+      "details": {
+        "jobid": "41cab803355cbafd"
+      }
+    },
+    {
+      "test_name": "予期しない成功",
+      "timestamp": "2025-07-23T15:33:58.442260",
+      "success": false,
+      "message": "エラーファイルが成功として処理されました",
+      "details": {
+        "status": "completed",
+        "result": "success",
+        "download_url": "http://sd001.nextpublishing.jp/rapture/api/download/41cab803355cbafd"
+      }
+    },
+    {
+      "test_name": "無効jobidハンドリング",
+      "timestamp": "2025-07-23T15:33:58.599330",
+      "success": true,
+      "message": "期待通り404エラーが返されました",
+      "details": {}
+    },
+    {
+      "test_name": "無効jobidダウンロード",
+      "timestamp": "2025-07-23T15:33:58.761428",
+      "success": true,
+      "message": "期待通り404エラーが返されました",
+      "details": {}
+    },
+    {
+      "test_name": "タイムアウト検出",
+      "timestamp": "2025-07-23T15:33:58.761487",
+      "success": false,
+      "message": "予期しないエラー: name 'tempfile' is not defined",
+      "details": {}
+    }
+  ],
+  "summary": {
+    "total_tests": 5,
+    "successful_tests": 3,
+    "failed_tests": 2,
+    "success_rate": "60.0%"
+  }
+}

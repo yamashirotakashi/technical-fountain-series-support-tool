@@ -1,0 +1,42 @@
+{
+  "timestamp": "2025-07-23T16:50:18.504127",
+  "api_base_url": "http://sd001.nextpublishing.jp/rapture",
+  "workflow_steps": [
+    {
+      "step_name": "ファイル確認",
+      "timestamp": "2025-07-23T16:50:18.506548",
+      "success": true,
+      "message": "ファイルサイズ: 5.83 MB",
+      "details": {}
+    },
+    {
+      "step_name": "アップロード",
+      "timestamp": "2025-07-23T16:50:37.403082",
+      "success": true,
+      "message": "アップロード成功 (所要時間: 18.9秒)",
+      "details": {
+        "jobid": "92508565122d3e91",
+        "upload_time_sec": 18.894716024398804,
+        "file_size_mb": 5.82936954498291
+      }
+    },
+    {
+      "step_name": "ステータス確認",
+      "timestamp": "2025-07-23T16:50:37.622697",
+      "success": false,
+      "message": "エラー発生: expected string or bytes-like object, got 'list'",
+      "details": {
+        "attempt": 1
+      }
+    }
+  ],
+  "test_case": "success",
+  "test_name": "成功ケース（警告なし）",
+  "test_file": "/mnt/c/Users/tky99/DEV/technical-fountain-series-support-tool/ReVIEW.zip",
+  "summary": {
+    "total_steps": 3,
+    "successful_steps": 2,
+    "failed_steps": 1,
+    "success_rate": "66.7%"
+  }
+}

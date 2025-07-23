@@ -1,0 +1,30 @@
+{
+  "summary": {
+    "test_date": "2025-07-23T15:38:36.449205",
+    "api_url": "http://sd001.nextpublishing.jp/rapture",
+    "authentication": "Basic (ep_user:Nn7eUTX5)"
+  },
+  "test_results": {
+    "connectivity": "All Passed",
+    "workflow": "Success (20 seconds average)",
+    "error_handling": "Partial Success (needs improvement)",
+    "performance": "Good (5.8MB in 19 seconds)"
+  },
+  "recommendations": {
+    "polling_interval": "10 seconds",
+    "timeout": "600 seconds (10 minutes)",
+    "retry_count": 3,
+    "implementation_notes": [
+      "Check warnings/errors even on success",
+      "Handle partial_success with download",
+      "Implement proper timeout handling",
+      "Add progress indication to UI"
+    ]
+  },
+  "server_requests": [
+    "Improve partial status processing time",
+    "Clarify error file detection criteria",
+    "Provide more detailed error messages",
+    "Add progress percentage if possible"
+  ]
+}
