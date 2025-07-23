@@ -10,7 +10,10 @@ from gui.components.log_panel import LogPanel
 from gui.components.progress_bar import ProgressPanel
 from gui.dialogs import FolderSelectorDialog
 from gui.dialogs.simple_file_selector_dialog import SimpleFileSelectorDialog
+from gui.dialogs.process_mode_dialog import ProcessModeDialog
+from gui.dialogs.warning_dialog import WarningDialog
 from core.workflow_processor import WorkflowProcessor
+from core.api_processor import ApiProcessor
 from utils.logger import get_logger
 from pathlib import Path
 
@@ -24,20 +27,26 @@ class ProcessWorker(QThread):
     confirmation_needed = pyqtSignal(str, str)
     folder_selection_needed = pyqtSignal(object, str, object)  # repo_path, repo_name, default_folder
     file_placement_confirmation_needed = pyqtSignal(str, list, object)  # honbun_folder_path, file_list, callback
+    warning_dialog_needed = pyqtSignal(list, str)  # messages, result_type
     finished = pyqtSignal()
     
-    def __init__(self, n_codes, email_password=None):
+    def __init__(self, n_codes, email_password=None, process_mode="traditional"):
         super().__init__()
         self.n_codes = n_codes
         self.email_password = email_password
+        self.process_mode = process_mode
         self.workflow_processor = None
+        self.api_processor = None
         self.logger = get_logger(__name__)
     
     def run(self):
         """処理を実行"""
         try:
-            # WorkflowProcessorを作成
-            self.workflow_processor = WorkflowProcessor(email_password=self.email_password)
+            # WorkflowProcessorを作成（処理方式を渡す）
+            self.workflow_processor = WorkflowProcessor(
+                email_password=self.email_password,
+                process_mode=self.process_mode
+            )
             
             # シグナルを接続
             self.workflow_processor.log_message.connect(self.log_message.emit)
@@ -45,6 +54,7 @@ class ProcessWorker(QThread):
             self.workflow_processor.status_updated.connect(self.status_updated.emit)
             self.workflow_processor.folder_selection_needed.connect(self.folder_selection_needed.emit)
             self.workflow_processor.file_placement_confirmation_needed.connect(self.file_placement_confirmation_needed.emit)
+            self.workflow_processor.warning_dialog_needed.connect(self.warning_dialog_needed.emit)
             
             # 処理を実行
             self.workflow_processor.process_n_codes(self.n_codes)
@@ -65,6 +75,7 @@ class MainWindow(QMainWindow):
         """MainWindowを初期化"""
         super().__init__()
         self.worker_thread = None
+        self.process_mode = ProcessModeDialog.MODE_TRADITIONAL  # デフォルトは従来方式
         self.setup_ui()
         self.setup_menu()
         self.setup_statusbar()
@@ -157,6 +168,7 @@ class MainWindow(QMainWindow):
         """シグナルを接続"""
         # 入力パネルからのシグナル
         self.input_panel.process_requested.connect(self.start_processing)
+        self.input_panel.settings_requested.connect(self.show_process_mode_dialog)
     
     @pyqtSlot(list)
     def start_processing(self, n_codes):
@@ -178,32 +190,33 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.No:
             return
         
-        # メールパスワードを取得（オプション）
+        # メールパスワードを取得（従来方式の場合のみ）
         email_password = None
-        reply = QMessageBox.question(
-            self,
-            "メール自動取得",
-            "メールを自動で取得しますか？\n（いいえを選択した場合は手動でダウンロードが必要です）",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            # 環境変数から取得を試みる
-            import os
-            email_password = os.getenv('GMAIL_APP_PASSWORD')
+        if self.process_mode == ProcessModeDialog.MODE_TRADITIONAL:
+            reply = QMessageBox.question(
+                self,
+                "メール自動取得",
+                "メールを自動で取得しますか？\n（いいえを選択した場合は手動でダウンロードが必要です）",
+                QMessageBox.Yes | QMessageBox.No
+            )
             
-            # 環境変数にない場合のみ入力を求める
-            if not email_password:
-                email_password, ok = QInputDialog.getText(
-                    self,
-                    "メールパスワード",
-                    "メールのアプリパスワードを入力してください:",
-                    QLineEdit.Password
-                )
-                if not ok or not email_password:
-                    email_password = None
-            else:
-                self.log_panel.append_log("環境変数からメールパスワードを取得しました", "INFO")
+            if reply == QMessageBox.Yes:
+                # 環境変数から取得を試みる
+                import os
+                email_password = os.getenv('GMAIL_APP_PASSWORD')
+                
+                # 環境変数にない場合のみ入力を求める
+                if not email_password:
+                    email_password, ok = QInputDialog.getText(
+                        self,
+                        "メールパスワード",
+                        "メールのアプリパスワードを入力してください:",
+                        QLineEdit.Password
+                    )
+                    if not ok or not email_password:
+                        email_password = None
+                else:
+                    self.log_panel.append_log("環境変数からメールパスワードを取得しました", "INFO")
         
         # UIを無効化
         self.input_panel.set_enabled(False)
@@ -213,17 +226,19 @@ class MainWindow(QMainWindow):
         self.progress_panel.set_total_items(len(n_codes))
         
         # ログに開始を記録
-        self.log_panel.append_log("処理を開始します", "INFO")
+        mode_text = "API方式" if self.process_mode == ProcessModeDialog.MODE_API else "従来方式"
+        self.log_panel.append_log(f"処理を開始します（{mode_text}）", "INFO")
         for n_code in n_codes:
             self.log_panel.append_log(f"キューに追加: {n_code}", "INFO")
         
         # ワーカースレッドを作成して開始
-        self.worker_thread = ProcessWorker(n_codes, email_password)
+        self.worker_thread = ProcessWorker(n_codes, email_password, self.process_mode)
         self.worker_thread.progress_updated.connect(self.progress_panel.update_progress)
         self.worker_thread.log_message.connect(self.log_panel.append_log)
         self.worker_thread.status_updated.connect(self.progress_panel.update_status)
         self.worker_thread.folder_selection_needed.connect(self.on_folder_selection_needed)
         self.worker_thread.file_placement_confirmation_needed.connect(self.on_file_placement_confirmation_needed)
+        self.worker_thread.warning_dialog_needed.connect(self.on_warning_dialog_needed)
         self.worker_thread.finished.connect(self.on_processing_finished)
         self.worker_thread.start()
         
@@ -380,3 +395,39 @@ class MainWindow(QMainWindow):
             self.worker_thread.wait()
         
         event.accept()
+    
+    @pyqtSlot()
+    def show_process_mode_dialog(self):
+        """処理方式選択ダイアログを表示"""
+        dialog = ProcessModeDialog(self)
+        if dialog.exec_() == dialog.Accepted:
+            self.process_mode = dialog.get_selected_mode()
+            mode_text = "API方式" if self.process_mode == ProcessModeDialog.MODE_API else "従来方式"
+            self.log_panel.append_log(f"処理方式を変更: {mode_text}", "INFO")
+            self.status_bar.showMessage(f"処理方式: {mode_text}")
+    
+    @pyqtSlot(list, str)
+    def on_warning_dialog_needed(self, messages, result_type):
+        """API処理の警告ダイアログを表示"""
+        self.log_panel.append_log(f"警告ダイアログ表示要求: {len(messages)}件のメッセージ ({result_type})", "INFO")
+        
+        # シンプルなQMessageBoxアプローチを使用（一時的な回避策）
+        USE_SIMPLE_DIALOG = True
+        
+        if USE_SIMPLE_DIALOG:
+            # QMessageBoxベースのシンプルなダイアログ
+            from gui.dialogs.simple_warning_dialog import show_warning_dialog
+            show_warning_dialog(self, messages, result_type)
+            self.log_panel.append_log("警告ダイアログを閉じました", "INFO")
+        else:
+            # カスタムダイアログ（元の実装）
+            # イベントを処理させる
+            QCoreApplication.processEvents()
+            
+            # ダイアログを作成して表示
+            dialog = WarningDialog(messages, result_type, self)
+            
+            # モーダルダイアログとして実行
+            result = dialog.exec_()
+            
+            self.log_panel.append_log(f"警告ダイアログを閉じました (結果: {result})", "INFO")

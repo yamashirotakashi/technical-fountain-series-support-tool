@@ -23,18 +23,27 @@ class WorkflowProcessor(QObject):
     confirmation_needed = pyqtSignal(str, str, object)  # title, message, callback
     folder_selection_needed = pyqtSignal(object, str, object)  # repo_path, repo_name, default_folder
     file_placement_confirmation_needed = pyqtSignal(str, list, object)  # honbun_folder_path, file_list, callback
+    warning_dialog_needed = pyqtSignal(list, str)  # messages, result_type
     
-    def __init__(self, email_address: str = None, email_password: str = None):
+    def __init__(self, email_address: str = None, email_password: str = None, process_mode: str = "traditional"):
         """
         WorkflowProcessorを初期化
         
         Args:
             email_address: メールアドレス（省略時は設定から取得）
             email_password: メールパスワード
+            process_mode: 処理方式 ("traditional" または "api")
         """
         super().__init__()
         self.logger = get_logger(__name__)
         self.config = get_config()
+        self.process_mode = process_mode
+        
+        # 初期化詳細ログ
+        self.logger.info(f"[INIT] WorkflowProcessor初期化開始")
+        self.logger.info(f"[INIT] process_mode: {process_mode}")
+        self.logger.info(f"[INIT] email_address: {email_address}")
+        self.logger.info(f"[INIT] has email_password: {email_password is not None}")
         
         # 各コンポーネントを初期化
         self.google_client = GoogleSheetClient()
@@ -44,6 +53,15 @@ class WorkflowProcessor(QObject):
         # WebClientとEmailMonitorは遅延初期化
         self._web_client = None
         self._email_monitor = None
+        self._api_processor = None
+        
+        # 属性チェック
+        self.logger.debug(f"[INIT] _api_processor初期化: {self._api_processor}")
+        self.logger.debug(f"[INIT] hasattr(_api_processor): {hasattr(self, '_api_processor')}")
+        self.logger.debug(f"[INIT] hasattr(api_processor): {hasattr(self, 'api_processor')}")
+        
+        # 全属性の確認
+        self.logger.debug(f"[INIT] 全属性: {dir(self)}")
         
         # メール設定（環境変数を優先）
         email_config = self.config.get_email_config()
@@ -70,6 +88,29 @@ class WorkflowProcessor(QObject):
             self._email_monitor = EmailMonitor(self.email_address, self.email_password)
             self._email_monitor.connect()
         return self._email_monitor
+    
+    @property
+    def api_processor(self):
+        """ApiProcessorの遅延初期化"""
+        self.logger.debug(f"[PROPERTY] api_processorプロパティが呼ばれました")
+        self.logger.debug(f"[PROPERTY] _api_processor現在の値: {self._api_processor}")
+        
+        if self._api_processor is None:
+            self.logger.debug(f"[PROPERTY] ApiProcessorをインポート中...")
+            from core.api_processor import ApiProcessor
+            
+            self.logger.debug(f"[PROPERTY] ApiProcessorをインスタンス化中...")
+            self._api_processor = ApiProcessor()
+            
+            self.logger.debug(f"[PROPERTY] シグナルを接続中...")
+            # シグナルを接続
+            self._api_processor.log_message.connect(self.log_message.emit)
+            self._api_processor.progress_updated.connect(self.progress_updated.emit)
+            self._api_processor.warning_dialog_needed.connect(self.warning_dialog_needed.emit)
+            
+            self.logger.debug(f"[PROPERTY] ApiProcessor初期化完了: {self._api_processor}")
+            
+        return self._api_processor
     
     def process_n_codes(self, n_codes: List[str]):
         """
@@ -151,67 +192,129 @@ class WorkflowProcessor(QObject):
         self.emit_log("ZIPファイルを作成中...", "INFO")
         zip_path = self.file_manager.create_zip(work_folder)
         
-        # 5. ファイルをアップロード
-        self.emit_log("ファイルをアップロード中...", "INFO")
-        upload_success = self.web_client.upload_file(zip_path, self.email_address)
-        
-        if not upload_success:
-            raise ValueError("ファイルのアップロードに失敗しました")
-        
-        # 6. メールを監視
-        if self.email_password:
-            self.emit_log("変換完了メールを待機中...", "INFO")
+        # 5. 処理方式に応じて分岐
+        self.logger.info(f"[PROCESS] 処理方式の分岐: process_mode={self.process_mode}")
+        if self.process_mode == "api":
+            # API方式の処理
+            self.emit_log("API方式で変換処理を開始...", "INFO")
             
-            # email_monitorプロパティを使用（遅延初期化）
+            # エラートレース用の詳細ログ
+            self.logger.debug(f"[API] api_processor取得前の属性チェック")
+            self.logger.debug(f"[API] hasattr(self, '_api_processor'): {hasattr(self, '_api_processor')}")
+            self.logger.debug(f"[API] hasattr(self, 'api_processor'): {hasattr(self, 'api_processor')}")
+            self.logger.debug(f"[API] self._api_processor: {self._api_processor}")
             
-            download_url = self.email_monitor.wait_for_email()
+            try:
+                # APIで処理（プロパティを使用して遅延初期化）
+                self.logger.debug(f"[API] api_processorプロパティにアクセス中...")
+                api_proc = self.api_processor
+                self.logger.debug(f"[API] api_processor取得成功: {api_proc}")
+                
+                self.logger.debug(f"[API] process_zip_fileを呼び出し中...")
+                self.logger.debug(f"[API] ZIPファイルパス: {zip_path}")
+                self.logger.debug(f"[API] ZIPファイルサイズ: {zip_path.stat().st_size:,} bytes")
+                
+                success, download_path, warnings = api_proc.process_zip_file(zip_path)
+                
+                self.logger.debug(f"[API] process_zip_file完了: success={success}, download_path={download_path}, warnings={len(warnings) if warnings else 0}")
+                
+                if warnings:
+                    self.logger.debug(f"[API] 警告メッセージ:")
+                    for i, warning in enumerate(warnings[:5]):  # 最初の5件
+                        self.logger.debug(f"  {i+1}. {warning}")
+                
+            except AttributeError as e:
+                self.logger.error(f"[API] AttributeError詳細: {e}")
+                self.logger.error(f"[API] 利用可能な属性: {[attr for attr in dir(self) if not attr.startswith('_')]}")
+                self.logger.error(f"[API] プライベート属性: {[attr for attr in dir(self) if attr.startswith('_') and not attr.startswith('__')]}")
+                raise
+            except Exception as e:
+                self.logger.error(f"[API] 予期しないエラー: {type(e).__name__}: {e}")
+                self.logger.error(f"[API] エラー詳細: {str(e)}")
+                import traceback
+                self.logger.error(f"[API] スタックトレース:\n{traceback.format_exc()}")
+                raise
             
-            if not download_url:
-                raise ValueError("タイムアウト: メールが届きませんでした")
+            if not success:
+                # 失敗の場合、詳細なエラー情報を含める
+                error_msg = "API変換処理が失敗しました"
+                if warnings:
+                    error_msg += f" (エラー/警告: {', '.join(warnings[:3])})"
+                self.logger.error(f"[API] 処理失敗の詳細: {error_msg}")
+                raise ValueError(error_msg)
             
-            # 7. ファイルをダウンロード
-            self.emit_log("変換済みファイルをダウンロード中...", "INFO")
-            download_path = self.file_manager.temp_dir / f"{n_code}_converted.zip"
-            download_success = self.web_client.download_file(download_url, download_path)
+            if not download_path:
+                # ダウンロードファイルがない場合（エラーのみ）
+                raise ValueError("変換ファイルのダウンロードに失敗しました")
             
-            if not download_success:
-                raise ValueError("ファイルのダウンロードに失敗しました")
+            # 成功または一部成功の場合、処理を続行
+            # download_pathは変換済みファイルのパス
             
-            # 8. ZIPファイルを処理（展開 + 1行目削除）
-            self.emit_log("ZIPファイルを処理中...", "INFO")
-            processed_files = self.word_processor.process_zip_file(download_path)
-            
-            if not processed_files:
-                raise ValueError("ZIPファイルの処理に失敗しました")
-            
-            self.emit_log(f"{len(processed_files)}個のWordファイルを処理しました", "INFO")
-            
-            # 9. Nフォルダと本文フォルダの存在確認
-            ncode_folder = self.word_processor.find_ncode_folder(n_code)
-            if not ncode_folder:
-                raise ValueError(f"Nコードフォルダが見つかりません: {n_code}")
-            
-            honbun_folder = self.word_processor.find_honbun_folder(ncode_folder)
-            if not honbun_folder:
-                raise ValueError(f"本文フォルダの場所を特定できません: {ncode_folder}")
-            
-            # 10. 本文フォルダパス確認（要件2.6）
-            self.emit_log("本文フォルダパス確認を表示中...", "INFO")
-            selected_files = self._show_file_placement_confirmation(str(honbun_folder), processed_files)
-            
-            if not selected_files:
-                raise ValueError("ユーザーによって処理がキャンセルされました")
-            
-            # 11. ファイル配置処理を実行
-            self.emit_log(f"選択された{len(selected_files)}個のファイルを本文フォルダに配置中...", "INFO")
-            copy_result = self._copy_files_to_honbun_folder(selected_files, honbun_folder)
-            
-            if not copy_result:
-                raise ValueError("ファイル配置に失敗しました")
-            
-            self.emit_log(f"✓ {n_code} の処理が完了しました", "INFO")
         else:
-            self.emit_log("メールパスワードが設定されていないため、手動でダウンロードしてください", "WARNING")
+            # 従来方式の処理
+            self.emit_log("従来方式で処理を開始...", "INFO")
+            
+            # ファイルをアップロード
+            self.emit_log("ファイルをアップロード中...", "INFO")
+            upload_success = self.web_client.upload_file(zip_path, self.email_address)
+            
+            if not upload_success:
+                raise ValueError("ファイルのアップロードに失敗しました")
+            
+            # 6. メールを監視
+            if self.email_password:
+                self.emit_log("変換完了メールを待機中...", "INFO")
+                
+                # email_monitorプロパティを使用（遅延初期化）
+                download_url = self.email_monitor.wait_for_email()
+                
+                if not download_url:
+                    raise ValueError("タイムアウト: メールが届きませんでした")
+                
+                # 7. ファイルをダウンロード
+                self.emit_log("変換済みファイルをダウンロード中...", "INFO")
+                download_path = self.file_manager.temp_dir / f"{n_code}_converted.zip"
+                download_success = self.web_client.download_file(download_url, download_path)
+                
+                if not download_success:
+                    raise ValueError("ファイルのダウンロードに失敗しました")
+            else:
+                self.emit_log("メールパスワードが設定されていないため、手動でダウンロードしてください", "WARNING")
+                return
+        
+        # 8. ZIPファイルを処理（展開 + 1行目削除）
+        self.emit_log("ZIPファイルを処理中...", "INFO")
+        processed_files = self.word_processor.process_zip_file(download_path)
+        
+        if not processed_files:
+            raise ValueError("ZIPファイルの処理に失敗しました")
+        
+        self.emit_log(f"{len(processed_files)}個のWordファイルを処理しました", "INFO")
+        
+        # 9. Nフォルダと本文フォルダの存在確認
+        ncode_folder = self.word_processor.find_ncode_folder(n_code)
+        if not ncode_folder:
+            raise ValueError(f"Nコードフォルダが見つかりません: {n_code}")
+        
+        honbun_folder = self.word_processor.find_honbun_folder(ncode_folder)
+        if not honbun_folder:
+            raise ValueError(f"本文フォルダの場所を特定できません: {ncode_folder}")
+        
+        # 10. 本文フォルダパス確認（要件2.6）
+        self.emit_log("本文フォルダパス確認を表示中...", "INFO")
+        selected_files = self._show_file_placement_confirmation(str(honbun_folder), processed_files)
+        
+        if not selected_files:
+            raise ValueError("ユーザーによって処理がキャンセルされました")
+        
+        # 11. ファイル配置処理を実行
+        self.emit_log(f"選択された{len(selected_files)}個のファイルを本文フォルダに配置中...", "INFO")
+        copy_result = self._copy_files_to_honbun_folder(selected_files, honbun_folder)
+        
+        if not copy_result:
+            raise ValueError("ファイル配置に失敗しました")
+        
+        self.emit_log(f"✓ {n_code} の処理が完了しました", "INFO")
     
     def emit_log(self, message: str, level: str = "INFO"):
         """ログメッセージを送信"""

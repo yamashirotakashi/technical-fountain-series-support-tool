@@ -12,6 +12,7 @@ class InputPanel(QWidget):
     
     # カスタムシグナル
     process_requested = pyqtSignal(list)  # Nコードのリストを送信
+    settings_requested = pyqtSignal()  # 設定ボタンクリック
     
     def __init__(self, parent=None):
         """
@@ -204,9 +205,7 @@ class InputPanel(QWidget):
     
     def on_settings_clicked(self):
         """設定ボタンがクリックされた時の処理"""
-        # TODO: 設定ダイアログを表示
-        from PyQt5.QtWidgets import QMessageBox
-        QMessageBox.information(self, "設定", "設定機能は実装予定です。")
+        self.settings_requested.emit()
     
     def show_error(self, message: str):
         """エラーメッセージを表示"""
