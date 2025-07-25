@@ -1,13 +1,13 @@
-"""リポジトリ設定ダイアログモジュール"""
-from PyQt5.QtWidgets import (
+﻿"""リポジトリ設定ダイアログモジュール"""
+from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGroupBox,
     QLabel, QLineEdit, QPushButton, QCheckBox,
     QTextEdit, QMessageBox
 )
-from PyQt5.QtCore import Qt
+from PyQt6.QtCore import Qt
 
 from utils.logger import get_logger
-from utils.config import get_config, save_config
+from utils.config import get_config
 from core.git_repository_manager import GitRepositoryManager
 
 
@@ -44,7 +44,7 @@ class RepositorySettingsDialog(QDialog):
         token_layout = QHBoxLayout()
         token_layout.addWidget(QLabel("GitHubトークン:"))
         self.github_token_edit = QLineEdit()
-        self.github_token_edit.setEchoMode(QLineEdit.Password)
+        self.github_token_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self.github_token_edit.setPlaceholderText("オプション（プライベートリポジトリ用）")
         token_layout.addWidget(self.github_token_edit)
         github_layout.addLayout(token_layout)
@@ -149,7 +149,7 @@ class RepositorySettingsDialog(QDialog):
             self.config.data['paths']['git_base'] = self.drive_path_edit.text()
             
             # 設定を保存
-            save_config(self.config.data)
+            self.config.save()
             
             # トークンは環境変数として設定を推奨
             token = self.github_token_edit.text()
@@ -172,7 +172,7 @@ class RepositorySettingsDialog(QDialog):
     
     def browse_drive_path(self):
         """Google Driveパスを参照"""
-        from PyQt5.QtWidgets import QFileDialog
+        from PyQt6.QtWidgets import QFileDialog
         path = QFileDialog.getExistingDirectory(
             self,
             "Google Driveパスを選択",
@@ -232,10 +232,10 @@ class RepositorySettingsDialog(QDialog):
             self,
             "確認",
             "すべてのキャッシュをクリアしますか？",
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             try:
                 self.git_manager.clear_cache()
                 QMessageBox.information(self, "完了", "キャッシュをクリアしました")

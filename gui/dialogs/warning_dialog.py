@@ -1,8 +1,8 @@
-"""警告メッセージダイアログ"""
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTextEdit,
-                             QLabel, QPushButton, QGroupBox)
-from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtGui import QIcon, QPixmap, QFont
+﻿"""警告メッセージダイアログ"""
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTextEdit,
+                             QLabel, QPushButton, QGroupBox, QStyle)
+from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtGui import QIcon, QPixmap, QFont
 
 
 class WarningDialog(QDialog):
@@ -36,10 +36,10 @@ class WarningDialog(QDialog):
         
         self.setModal(True)
         self.setMinimumSize(700, 500)
-        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.WindowCloseButtonHint)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowTitleHint | Qt.WindowType.WindowCloseButtonHint)
         
         # システムサウンドを再生（エラーまたは警告音）
-        from PyQt5.QtWidgets import QApplication
+        from PyQt6.QtWidgets import QApplication
         if self.result_type == "error":
             QApplication.beep()  # エラー音
         
@@ -61,12 +61,12 @@ class WarningDialog(QDialog):
         icon_label = QLabel()
         if icon_type == "error":
             icon_label.setPixmap(self.style().standardPixmap(
-                self.style().SP_MessageBoxCritical
-            ).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                QStyle.StandardPixmap.SP_MessageBoxCritical
+            ).scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         else:
             icon_label.setPixmap(self.style().standardPixmap(
-                self.style().SP_MessageBoxWarning
-            ).scaled(48, 48, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                QStyle.StandardPixmap.SP_MessageBoxWarning
+            ).scaled(48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
         header_layout.addWidget(icon_label)
         
         # タイトルと説明
@@ -179,7 +179,7 @@ class WarningDialog(QDialog):
     def copy_to_clipboard(self):
         """メッセージをクリップボードにコピー"""
         try:
-            from PyQt5.QtWidgets import QApplication
+            from PyQt6.QtWidgets import QApplication
             clipboard = QApplication.clipboard()
             clipboard.setText(self.text_edit.toPlainText())
             
@@ -191,7 +191,7 @@ class WarningDialog(QDialog):
                 sender.setEnabled(False)
                 
                 # 2秒後に元に戻す
-                from PyQt5.QtCore import QTimer
+                from PyQt6.QtCore import QTimer
                 QTimer.singleShot(2000, lambda: (
                     sender.setText(original_text),
                     sender.setEnabled(True)

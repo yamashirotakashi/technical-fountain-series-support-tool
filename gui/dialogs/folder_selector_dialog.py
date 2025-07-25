@@ -1,15 +1,15 @@
-"""フォルダ選択ダイアログ"""
+﻿"""フォルダ選択ダイアログ"""
 import json
 import os
 from pathlib import Path
 from typing import Optional, Dict
-from PyQt5.QtWidgets import (
+from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
     QPushButton, QLabel, QCheckBox, QSplitter, QTextEdit, QMessageBox,
-    QWidget
+    QWidget, QStyle
 )
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QIcon, QFont
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QIcon, QFont
 
 from utils.logger import get_logger
 
@@ -66,7 +66,7 @@ class FolderSelectorDialog(QDialog):
         main_layout.addWidget(info_label)
         
         # スプリッター（ツリーとプレビュー）
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # ファイルツリー
         self.tree_widget = QTreeWidget()
@@ -79,7 +79,7 @@ class FolderSelectorDialog(QDialog):
         preview_layout = QVBoxLayout(preview_widget)
         
         preview_label = QLabel("選択されたフォルダ:")
-        preview_label.setFont(QFont("", 10, QFont.Bold))
+        preview_label.setFont(QFont("", 10, QFont.Weight.Bold))
         preview_layout.addWidget(preview_label)
         
         self.path_label = QLabel("")
@@ -88,7 +88,7 @@ class FolderSelectorDialog(QDialog):
         preview_layout.addWidget(self.path_label)
         
         preview_label2 = QLabel("フォルダ内容:")
-        preview_label2.setFont(QFont("", 10, QFont.Bold))
+        preview_label2.setFont(QFont("", 10, QFont.Weight.Bold))
         preview_layout.addWidget(preview_label2)
         
         self.preview_text = QTextEdit()
@@ -129,11 +129,11 @@ class FolderSelectorDialog(QDialog):
         """ファイルツリーを構築"""
         root_item = QTreeWidgetItem(self.tree_widget)
         root_item.setText(0, self.repo_path.name)
-        root_item.setData(0, Qt.UserRole, str(self.repo_path))
+        root_item.setData(0, Qt.ItemDataRole.UserRole, str(self.repo_path))
         root_item.setExpanded(True)
         
         # アイコンを設定
-        root_item.setIcon(0, self.style().standardIcon(self.style().SP_DirIcon))
+        root_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
         
         self._add_tree_items(root_item, self.repo_path)
     
@@ -145,17 +145,17 @@ class FolderSelectorDialog(QDialog):
                 if item.is_dir() and not item.name.startswith('.'):
                     child_item = QTreeWidgetItem(parent_item)
                     child_item.setText(0, item.name)
-                    child_item.setData(0, Qt.UserRole, str(item))
+                    child_item.setData(0, Qt.ItemDataRole.UserRole, str(item))
                     
                     # Re:VIEWフォルダかチェック
                     if self._is_review_folder(item):
-                        child_item.setIcon(0, self.style().standardIcon(self.style().SP_DirOpenIcon))
+                        child_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon))
                         # 太字で表示
                         font = child_item.font(0)
                         font.setBold(True)
                         child_item.setFont(0, font)
                     else:
-                        child_item.setIcon(0, self.style().standardIcon(self.style().SP_DirIcon))
+                        child_item.setIcon(0, self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
                     
                     # 再帰的に子アイテムを追加
                     self._add_tree_items(child_item, item)
@@ -180,7 +180,7 @@ class FolderSelectorDialog(QDialog):
     
     def _on_item_clicked(self, item: QTreeWidgetItem, column: int):
         """アイテムクリック時の処理"""
-        path = Path(item.data(0, Qt.UserRole))
+        path = Path(item.data(0, Qt.ItemDataRole.UserRole))
         self.selected_folder = path
         
         # パスを表示
@@ -266,10 +266,10 @@ class FolderSelectorDialog(QDialog):
                 self, "確認",
                 "選択されたフォルダにはRe:VIEWの必須ファイルが含まれていません。\n"
                 "このフォルダを使用しますか？",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
-            if reply == QMessageBox.No:
+            if reply == QMessageBox.StandardButton.No:
                 return
         
         # 選択を確定（ダイアログは閉じない）

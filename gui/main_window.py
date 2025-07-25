@@ -1,13 +1,13 @@
-"""メインウィンドウモジュール"""
-from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+﻿"""メインウィンドウモジュール"""
+from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QSplitter, QMenuBar, QStatusBar, QMessageBox,
-                             QInputDialog, QLineEdit, QAction)
-from PyQt5.QtCore import Qt, pyqtSlot, QThread, pyqtSignal, QCoreApplication
-from PyQt5.QtGui import QIcon
+                             QInputDialog, QLineEdit)
+from PyQt6.QtCore import Qt, pyqtSlot, QThread, pyqtSignal, QCoreApplication
+from PyQt6.QtGui import QIcon, QAction
 
-from gui.components.input_panel import InputPanel
-from gui.components.log_panel import LogPanel
-from gui.components.progress_bar import ProgressPanel
+from gui.components.input_panel_qt6 import InputPanel
+from gui.components.log_panel_qt6 import LogPanel
+from gui.components.progress_bar_qt6 import ProgressPanel
 from gui.dialogs import FolderSelectorDialog
 from gui.dialogs.simple_file_selector_dialog import SimpleFileSelectorDialog
 from gui.dialogs.process_mode_dialog import ProcessModeDialog
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
         self.input_panel = InputPanel()
         
         # 中央：スプリッター（ログパネル）
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
         
         # ログパネル
         self.log_panel = LogPanel()
@@ -184,10 +184,10 @@ class MainWindow(QMainWindow):
             self,
             "処理の確認",
             message,
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.No:
+        if reply == QMessageBox.StandardButton.No:
             return
         
         # メールパスワードを取得（従来方式の場合のみ）
@@ -197,10 +197,10 @@ class MainWindow(QMainWindow):
                 self,
                 "メール自動取得",
                 "メールを自動で取得しますか？\n（いいえを選択した場合は手動でダウンロードが必要です）",
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 # 環境変数から取得を試みる
                 import os
                 email_password = os.getenv('GMAIL_APP_PASSWORD')
@@ -211,7 +211,7 @@ class MainWindow(QMainWindow):
                         self,
                         "メールパスワード",
                         "メールのアプリパスワードを入力してください:",
-                        QLineEdit.Password
+                        QLineEdit.EchoMode.Password
                     )
                     if not ok or not email_password:
                         email_password = None
@@ -272,7 +272,7 @@ class MainWindow(QMainWindow):
             self,
             title,
             message,
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         return reply == QMessageBox.StandardButton.Yes
     
@@ -292,7 +292,7 @@ class MainWindow(QMainWindow):
         """リポジトリ設定ダイアログを表示"""
         from gui.repository_settings_dialog import RepositorySettingsDialog
         dialog = RepositorySettingsDialog(self)
-        dialog.exec_()
+        dialog.exec()
     
     @pyqtSlot(object, str, object)
     def on_folder_selection_needed(self, repo_path, repo_name, default_folder):
@@ -318,7 +318,7 @@ class MainWindow(QMainWindow):
         dialog.folder_confirmed.connect(on_folder_confirmed)
         
         # ダイアログを表示
-        result = dialog.exec_()
+        result = dialog.exec()
         if result != dialog.Accepted:
             # キャンセルされた場合
             self.log_panel.append_log("フォルダ選択がキャンセルされました", "WARNING")
@@ -343,20 +343,20 @@ class MainWindow(QMainWindow):
                 f"配置先: {honbun_folder_path}\n\n"
                 f"ファイル:\n{file_list_str}\n\n"
                 f"全てのファイルを配置しますか？",
-                QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
-                QMessageBox.Yes
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Yes
             )
             
-            if reply == QMessageBox.Cancel:
+            if reply == QMessageBox.StandardButton.Cancel:
                 self.log_panel.append_log("ファイル配置がキャンセルされました", "INFO")
                 if callback:
                     callback([])
                 return
             
-            if reply == QMessageBox.No:
+            if reply == QMessageBox.StandardButton.No:
                 # 一部ファイルのみ選択
                 dialog = SimpleFileSelectorDialog(file_list, self)
-                if dialog.exec_() == QMessageBox.Accepted:
+                if dialog.exec() == QMessageBox.Accepted:
                     selected_files = dialog.get_selected_files()
                     self.log_panel.append_log(f"ファイル選択: {len(selected_files)}個を選択", "INFO")
                     if callback:
@@ -383,10 +383,10 @@ class MainWindow(QMainWindow):
                 self,
                 "終了の確認",
                 "処理が実行中です。終了しますか？",
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             
-            if reply == QMessageBox.No:
+            if reply == QMessageBox.StandardButton.No:
                 event.ignore()
                 return
             
@@ -400,7 +400,7 @@ class MainWindow(QMainWindow):
     def show_process_mode_dialog(self):
         """処理方式選択ダイアログを表示"""
         dialog = ProcessModeDialog(self)
-        if dialog.exec_() == dialog.Accepted:
+        if dialog.exec() == dialog.Accepted:
             self.process_mode = dialog.get_selected_mode()
             mode_text = "API方式" if self.process_mode == ProcessModeDialog.MODE_API else "従来方式"
             self.log_panel.append_log(f"処理方式を変更: {mode_text}", "INFO")
@@ -428,6 +428,6 @@ class MainWindow(QMainWindow):
             dialog = WarningDialog(messages, result_type, self)
             
             # モーダルダイアログとして実行
-            result = dialog.exec_()
+            result = dialog.exec()
             
             self.log_panel.append_log(f"警告ダイアログを閉じました (結果: {result})", "INFO")

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """技術の泉シリーズ制作支援ツール - エントリーポイント"""
 import sys
@@ -13,8 +13,8 @@ load_dotenv()
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt
+from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt
 from gui.main_window import MainWindow
 from utils.logger import get_logger
 
@@ -27,8 +27,8 @@ def main():
     
     # High DPI対応
     try:
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+        QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
+        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
     except AttributeError:
         pass  # PyQt5の古いバージョンでは利用できない場合がある
     

@@ -1,7 +1,7 @@
-"""処理方式選択ダイアログ"""
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QRadioButton,
+﻿"""処理方式選択ダイアログ"""
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QRadioButton,
                              QButtonGroup, QLabel, QPushButton, QGroupBox)
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 
 
 class ProcessModeDialog(QDialog):
@@ -16,7 +16,7 @@ class ProcessModeDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.selected_mode = self.MODE_TRADITIONAL  # デフォルトは従来方式
+        self.selected_mode = self.MODE_API  # デフォルトはAPI方式
         self.setup_ui()
     
     def setup_ui(self):
@@ -48,7 +48,7 @@ class ProcessModeDialog(QDialog):
         
         # 従来方式ラジオボタン
         self.traditional_radio = QRadioButton("従来方式（メール経由）")
-        self.traditional_radio.setChecked(True)  # デフォルトで選択
+        self.traditional_radio.setChecked(False)  # API方式がデフォルト
         self.button_group.addButton(self.traditional_radio)
         group_layout.addWidget(self.traditional_radio)
         
@@ -66,6 +66,7 @@ class ProcessModeDialog(QDialog):
         
         # API方式ラジオボタン
         self.api_radio = QRadioButton("API方式（直接変換）")
+        self.api_radio.setChecked(True)  # デフォルトで選択
         self.button_group.addButton(self.api_radio)
         group_layout.addWidget(self.api_radio)
         

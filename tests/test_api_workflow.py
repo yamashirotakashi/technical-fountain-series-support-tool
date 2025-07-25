@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 ReVIEW変換API 基本フロー動作確認テスト
 

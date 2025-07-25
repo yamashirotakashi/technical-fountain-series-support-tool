@@ -1,4 +1,4 @@
-"""設定管理モジュール"""
+﻿"""設定管理モジュール"""
 import json
 import os
 from pathlib import Path
@@ -68,6 +68,48 @@ class Config:
     def get_email_config(self) -> Dict[str, Any]:
         """メール関連の設定を取得"""
         return self._config.get('email', {})
+    
+    @property
+    def data(self) -> Dict[str, Any]:
+        """設定データ全体を取得"""
+        return self._config
+    
+    def save(self, data: Dict[str, Any] = None) -> None:
+        """
+        設定を保存
+        
+        Args:
+            data: 保存するデータ（省略時は現在の設定を保存）
+        """
+        if data is not None:
+            self._config = data
+        
+        # 設定ファイルのディレクトリが存在しない場合は作成
+        self.config_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # 設定を保存
+        with open(self.config_path, 'w', encoding='utf-8') as f:
+            json.dump(self._config, f, ensure_ascii=False, indent=2)
+    
+    def update(self, key_path: str, value: Any) -> None:
+        """
+        ドット記法で設定値を更新
+        
+        Args:
+            key_path: 更新するキーのパス（例: "google_sheet.sheet_id"）
+            value: 設定する値
+        """
+        keys = key_path.split('.')
+        current = self._config
+        
+        # 最後のキーまで辿る（必要に応じて辞書を作成）
+        for key in keys[:-1]:
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+        
+        # 値を設定
+        current[keys[-1]] = value
     
     def get_credentials_path(self) -> Path:
         """Google認証情報ファイルのパスを取得（絶対パスに変換）"""

@@ -1,10 +1,10 @@
-"""ワークフロー処理管理モジュール"""
+﻿"""ワークフロー処理管理モジュール"""
 import os
 import tempfile
 import time
 from pathlib import Path
 from typing import List, Optional, Callable
-from PyQt5.QtCore import QObject, pyqtSignal, pyqtSlot
+from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 
 from core.google_sheet import GoogleSheetClient
 from core.file_manager import FileManager
@@ -180,7 +180,7 @@ class WorkflowProcessor(QObject):
         while not self.folder_selection_completed and (time.time() - start_time) < timeout:
             time.sleep(0.1)
             # GUIイベントループを処理するために必要
-            from PyQt5.QtCore import QCoreApplication
+            from PyQt6.QtCore import QCoreApplication
             QCoreApplication.processEvents()
         
         work_folder = self.selected_work_folder
@@ -194,6 +194,10 @@ class WorkflowProcessor(QObject):
         
         # 5. 処理方式に応じて分岐
         self.logger.info(f"[PROCESS] 処理方式の分岐: process_mode={self.process_mode}")
+        self.logger.info(f"[PROCESS] process_mode == 'api': {self.process_mode == 'api'}")
+        self.logger.info(f"[PROCESS] process_mode type: {type(self.process_mode)}")
+        self.logger.info(f"[PROCESS] process_mode repr: {repr(self.process_mode)}")
+        
         if self.process_mode == "api":
             # API方式の処理
             self.emit_log("API方式で変換処理を開始...", "INFO")
@@ -398,7 +402,7 @@ class WorkflowProcessor(QObject):
         while self.file_placement_result is None and (time.time() - start_time) < timeout:
             time.sleep(0.1)
             # GUIイベントループを処理するために必要
-            from PyQt5.QtCore import QCoreApplication
+            from PyQt6.QtCore import QCoreApplication
             QCoreApplication.processEvents()
         
         if self.file_placement_result is None:
