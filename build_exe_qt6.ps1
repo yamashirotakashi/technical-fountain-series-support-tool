@@ -1,15 +1,14 @@
-# Qt6版 exe化スクリプト
-# Windows PowerShell用
+# Qt6 EXE Build Script
+# Windows PowerShell
 
-Write-Host "技術の泉シリーズ制作支援ツール Qt6版 exe化スクリプト" -ForegroundColor Cyan
-Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "TechZip Qt6 EXE Build Script" -ForegroundColor Cyan
+Write-Host "============================" -ForegroundColor Cyan
 Write-Host ""
 
-# Python実行可能ファイルの確認
-# 複数の一般的なPythonパスを試す
+# Python executable check
 $pythonPaths = @(
-    "python",  # PATH環境変数に設定されている場合
-    "py",      # Python Launcher
+    "python",
+    "py",
     "C:\Python313\python.exe",
     "C:\Python312\python.exe",
     "C:\Python311\python.exe",
@@ -29,68 +28,65 @@ foreach ($path in $pythonPaths) {
     try {
         $testPath = if ($path -match "^[A-Z]:") { $path } else { (Get-Command $path -ErrorAction SilentlyContinue).Path }
         if ($testPath -and (Test-Path $testPath)) {
-            # Pythonバージョンを確認
             $version = & $testPath --version 2>&1
             if ($version -match "Python 3\.(1[0-3]|[89])") {
                 $pythonPath = $testPath
-                Write-Host "Pythonを検出: $pythonPath ($version)" -ForegroundColor Green
+                Write-Host "Found Python: $pythonPath ($version)" -ForegroundColor Green
                 break
             }
         }
     } catch {
-        # エラーは無視して次を試す
+        # Ignore errors and try next
     }
 }
 
 if (-not $pythonPath) {
-    Write-Host "エラー: Python 3.8以上が見つかりません" -ForegroundColor Red
-    Write-Host "Pythonをインストールしてください" -ForegroundColor Yellow
+    Write-Host "Error: Python 3.8+ not found" -ForegroundColor Red
+    Write-Host "Please install Python" -ForegroundColor Yellow
     pause
     exit 1
 }
 
-# PyInstallerのインストール確認
-Write-Host "PyInstallerの確認..." -ForegroundColor Yellow
+# PyInstaller check
+Write-Host "Checking PyInstaller..." -ForegroundColor Yellow
 & $pythonPath -m pip show pyinstaller > $null 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "PyInstallerをインストールしています..." -ForegroundColor Yellow
+    Write-Host "Installing PyInstaller..." -ForegroundColor Yellow
     & $pythonPath -m pip install pyinstaller
 }
 
-# PyQt6の確認
-Write-Host "PyQt6の確認..." -ForegroundColor Yellow
+# PyQt6 check
+Write-Host "Checking PyQt6..." -ForegroundColor Yellow
 & $pythonPath -c "import PyQt6.QtCore; print(f'PyQt6 version: {PyQt6.QtCore.QT_VERSION_STR}')"
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "エラー: PyQt6がインストールされていません" -ForegroundColor Red
-    Write-Host "先にrun_qt6_windows.ps1を実行してください" -ForegroundColor Yellow
+    Write-Host "Error: PyQt6 not installed" -ForegroundColor Red
+    Write-Host "Please run run_qt6_windows.ps1 first" -ForegroundColor Yellow
     pause
     exit 1
 }
 
-# クリーンビルドの確認
-$cleanBuild = Read-Host "クリーンビルドを実行しますか? (Y/n)"
+# Clean build confirmation
+$cleanBuild = Read-Host "Perform clean build? (Y/n)"
 if ($cleanBuild -ne 'n') {
-    Write-Host "ビルドディレクトリをクリーンアップしています..." -ForegroundColor Yellow
+    Write-Host "Cleaning build directories..." -ForegroundColor Yellow
     Remove-Item -Path "build" -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path "dist" -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -Path "__pycache__" -Recurse -Force -ErrorAction SilentlyContinue
-    Remove-Item -Path "*.spec" -Force -ErrorAction SilentlyContinue  < /dev/null |  Where-Object { $_.Name -ne "techzip_qt6.spec" }
+    Get-ChildItem -Path "*.spec" | Where-Object { $_.Name -ne "techzip_qt6.spec" } | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
-# exe化の実行
+# EXE build execution
 Write-Host ""
-Write-Host "exe化を開始します..." -ForegroundColor Green
+Write-Host "Starting EXE build..." -ForegroundColor Green
 
-# specファイルが存在する場合はそれを使用
+# Use spec file if exists
 if (Test-Path "techzip_qt6.spec") {
-    Write-Host "techzip_qt6.specを使用してビルドします" -ForegroundColor Cyan
+    Write-Host "Building with techzip_qt6.spec" -ForegroundColor Cyan
     & $pythonPath -m PyInstaller techzip_qt6.spec
 } else {
-    Write-Host "新規にexeを作成します" -ForegroundColor Cyan
+    Write-Host "Creating new exe" -ForegroundColor Cyan
     & $pythonPath -m PyInstaller --onefile --windowed --name TechZip_Qt6 `
         --add-data "config;config" `
-        --add-data "logs;logs" `
-        --add-data "templates;templates" `
         --hidden-import PyQt6.QtCore `
         --hidden-import PyQt6.QtGui `
         --hidden-import PyQt6.QtWidgets `
@@ -101,76 +97,54 @@ if (Test-Path "techzip_qt6.spec") {
         main_qt6.py
 }
 
-# ビルド結果の確認
+# Build result check
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
-    Write-Host "ビルドが成功しました！" -ForegroundColor Green
+    Write-Host "Build successful!" -ForegroundColor Green
     
     if (Test-Path "dist\TechZip_Qt6.exe") {
         $exeInfo = Get-Item "dist\TechZip_Qt6.exe"
-        Write-Host "作成されたexe: $($exeInfo.FullName)" -ForegroundColor Cyan
-        Write-Host "ファイルサイズ: $([math]::Round($exeInfo.Length / 1MB, 2)) MB" -ForegroundColor Cyan
+        Write-Host "Created exe: $($exeInfo.FullName)" -ForegroundColor Cyan
+        Write-Host "File size: $([math]::Round($exeInfo.Length / 1MB, 2)) MB" -ForegroundColor Cyan
         
-        # 必要なファイルのコピー
+        # Copy required files
         Write-Host ""
-        Write-Host "必要なファイルをコピーしています..." -ForegroundColor Yellow
+        Write-Host "Copying required files..." -ForegroundColor Yellow
         
-        # configフォルダのコピー
+        # Copy config folder
         if (Test-Path "config") {
             Copy-Item -Path "config" -Destination "dist\config" -Recurse -Force
-            Write-Host "✓ configフォルダをコピーしました" -ForegroundColor Green
+            Write-Host "✓ Copied config folder" -ForegroundColor Green
         }
         
-        # .envファイルのサンプル作成
+        # Create .env sample file
         if (Test-Path ".env") {
-            $envContent = @"
-# Gmail設定
-GMAIL_ADDRESS=your_email@gmail.com
-GMAIL_APP_PASSWORD=your_app_password_here
-
-# GitHub設定（オプション）
-GITHUB_TOKEN=your_github_token_here
-"@
+            $envContent = "# Gmail setting`nGMAIL_ADDRESS=your_email@gmail.com`nGMAIL_APP_PASSWORD=your_app_password_here`n`n# GitHub setting (optional)`nGITHUB_TOKEN=your_github_token_here"
             $envContent | Out-File -FilePath "dist\.env.sample" -Encoding UTF8
-            Write-Host "✓ .env.sampleを作成しました" -ForegroundColor Green
+            Write-Host "✓ Created .env.sample" -ForegroundColor Green
         }
         
-        # READMEの作成
-        $readmeContent = @"
-# 技術の泉シリーズ制作支援ツール (Qt6版)
-
-## 実行方法
-1. TechZip_Qt6.exe をダブルクリックして起動
-2. 初回起動時は .env.sample を .env にリネームして設定を入力
-
-## 必要なファイル
-- TechZip_Qt6.exe (本体)
-- config/ (設定ファイル)
-- .env (認証情報)
-
-## トラブルシューティング
-- Windows Defenderで警告が出る場合は「詳細情報」→「実行」を選択
-- 起動しない場合はlogsフォルダのログを確認
-"@
+        # Create README
+        $readmeContent = "# TechZip Qt6 Tool`n`n## How to run`n1. Double-click TechZip_Qt6.exe to start`n2. For first time use, rename .env.sample to .env and enter settings`n`n## Required files`n- TechZip_Qt6.exe (main application)`n- config/ (configuration files)`n- .env (authentication info)`n`n## Troubleshooting`n- If Windows Defender shows warning, select 'More info' then 'Run anyway'`n- If not starting, check logs folder for error logs"
         $readmeContent | Out-File -FilePath "dist\README.txt" -Encoding UTF8
-        Write-Host "✓ README.txtを作成しました" -ForegroundColor Green
+        Write-Host "✓ Created README.txt" -ForegroundColor Green
         
         Write-Host ""
-        Write-Host "配布の準備が完了しました！" -ForegroundColor Green
-        Write-Host "distフォルダ内のファイルを配布してください。" -ForegroundColor Cyan
+        Write-Host "Distribution ready!" -ForegroundColor Green
+        Write-Host "Please distribute files in dist folder." -ForegroundColor Cyan
         
-        # エクスプローラーで開く
-        $openExplorer = Read-Host "distフォルダを開きますか? (Y/n)"
+        # Open in explorer
+        $openExplorer = Read-Host "Open dist folder? (Y/n)"
         if ($openExplorer -ne 'n') {
             explorer.exe dist
         }
     }
 } else {
     Write-Host ""
-    Write-Host "ビルドに失敗しました。" -ForegroundColor Red
-    Write-Host "エラーログを確認してください。" -ForegroundColor Yellow
+    Write-Host "Build failed." -ForegroundColor Red
+    Write-Host "Please check error logs." -ForegroundColor Yellow
 }
 
 Write-Host ""
-Write-Host "Enterキーを押して終了..."
+Write-Host "Press Enter to exit..."
 Read-Host

@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 # プロジェクトのベースディレクトリ
-BASE_DIR = Path(__file__).parent
+import os
+BASE_DIR = Path(os.getcwd())
 
 # アイコンファイル（存在する場合）
 ICON_FILE = BASE_DIR / 'assets' / 'icon.ico' if (BASE_DIR / 'assets' / 'icon.ico').exists() else None
@@ -16,8 +17,6 @@ a = Analysis(
     binaries=[],
     datas=[
         ('config', 'config'),
-        ('logs', 'logs'),
-        ('templates', 'templates'),
     ],
     hiddenimports=[
         'PyQt6.QtCore',
@@ -67,7 +66,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='TechZip_Qt6',
+    name='TechZip_Qt6_New',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
