@@ -1,30 +1,31 @@
-# PowerShellスクリプト - 技術の泉シリーズ制作支援ツール起動
+# PowerShellスクリプト - 技術の泉シリーズ制作支援ツール起動（ネイティブ版）
 
 # スクリプトのディレクトリに移動
 Set-Location $PSScriptRoot
 
 Write-Host "技術の泉シリーズ制作支援ツールを起動しています..." -ForegroundColor Green
+Write-Host "ネイティブ・グローバル環境で実行します" -ForegroundColor Cyan
 
-# 仮想環境のチェック
-if (Test-Path ".\venv_windows") {
-    # Pythonの実行パスを確認
-    $pythonPath = ".\venv_windows\Scripts\python.exe"
-    if (Test-Path $pythonPath) {
-        Write-Host "仮想環境のPythonを使用: $pythonPath" -ForegroundColor Cyan
-        
-        # PYTHONPATH を設定（仮想環境のライブラリを優先）
-        $env:PYTHONPATH = ".\venv_windows\Lib\site-packages"
-        
-        # 仮想環境のPythonを直接実行（Activateスクリプトを使わない）
-        & $pythonPath main.py
-    } else {
-        Write-Host "警告: 仮想環境のPythonが見つかりません。システムのPythonを使用します。" -ForegroundColor Yellow
-        # フォールバック: システムのPythonを使用
+# システムのPythonを直接使用（exe化対応）
+try {
+    # Pythonが利用可能かチェック
+    $pythonVersion = python --version 2>&1
+    Write-Host "Python環境: $pythonVersion" -ForegroundColor Green
+    
+    # アプリケーションを起動
+    python main.py
+    
+} catch {
+    # フォールバック: python.exeを試行
+    try {
+        $pythonVersion = python.exe --version 2>&1
+        Write-Host "Python環境: $pythonVersion" -ForegroundColor Green
         python.exe main.py
+    } catch {
+        Write-Host "エラー: Pythonが見つかりません" -ForegroundColor Red
+        Write-Host "Pythonがグローバル環境にインストールされていることを確認してください" -ForegroundColor Yellow
+        Write-Host "必要なパッケージもpip install -r requirements.txtでインストールしてください" -ForegroundColor Yellow
     }
-} else {
-    Write-Host "エラー: 仮想環境が見つかりません" -ForegroundColor Red
-    Write-Host "setup_windows.ps1を先に実行してください" -ForegroundColor Yellow
 }
 
 Write-Host "終了するには任意のキーを押してください..."
