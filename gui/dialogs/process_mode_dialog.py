@@ -10,6 +10,7 @@ class ProcessModeDialog(QDialog):
     # 処理方式の定義
     MODE_TRADITIONAL = "traditional"
     MODE_API = "api"
+    MODE_GMAIL_API = "gmail_api"
     
     # シグナル
     mode_selected = pyqtSignal(str)  # 選択された処理方式
@@ -23,7 +24,7 @@ class ProcessModeDialog(QDialog):
         """UIを構築"""
         self.setWindowTitle("処理方式の選択")
         self.setModal(True)
-        self.setFixedSize(400, 250)
+        self.setFixedSize(450, 350)
         
         # メインレイアウト
         layout = QVBoxLayout()
@@ -31,9 +32,7 @@ class ProcessModeDialog(QDialog):
         
         # 説明ラベル
         description = QLabel(
-            "変換処理の方式を選択してください。\n"
-            "従来方式: メール経由でファイルを送信\n"
-            "API方式: 直接APIを使用して高速変換"
+            "変換処理の方式を選択してください。"
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -78,6 +77,24 @@ class ProcessModeDialog(QDialog):
         )
         api_desc.setStyleSheet("QLabel { margin-left: 20px; color: #666; }")
         group_layout.addWidget(api_desc)
+        
+        # スペース
+        group_layout.addSpacing(10)
+        
+        # Gmail API方式ラジオボタン
+        self.gmail_api_radio = QRadioButton("Gmail API方式（OAuth認証）")
+        self.gmail_api_radio.setChecked(False)
+        self.button_group.addButton(self.gmail_api_radio)
+        group_layout.addWidget(self.gmail_api_radio)
+        
+        # Gmail API方式の説明
+        gmail_api_desc = QLabel(
+            "  • Gmail APIを使用してメール監視\n"
+            "  • アプリパスワード不要\n"
+            "  • 既存のOAuth認証を再利用"
+        )
+        gmail_api_desc.setStyleSheet("QLabel { margin-left: 20px; color: #666; }")
+        group_layout.addWidget(gmail_api_desc)
         
         layout.addWidget(group_box)
         
@@ -132,8 +149,12 @@ class ProcessModeDialog(QDialog):
         """選択された処理方式を取得"""
         if self.traditional_radio.isChecked():
             return self.MODE_TRADITIONAL
-        else:
+        elif self.api_radio.isChecked():
             return self.MODE_API
+        elif self.gmail_api_radio.isChecked():
+            return self.MODE_GMAIL_API
+        else:
+            return self.MODE_API  # デフォルト
     
     def accept(self):
         """OKボタンが押された時の処理"""

@@ -194,9 +194,9 @@ class MainWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.No:
             return
         
-        # メールパスワードを取得（従来方式の場合のみ）
+        # メールパスワードを取得（従来方式・Gmail API方式の場合のみメール監視が必要）
         email_password = None
-        if self.process_mode == ProcessModeDialog.MODE_TRADITIONAL:
+        if self.process_mode == ProcessModeDialog.MODE_TRADITIONAL or self.process_mode == ProcessModeDialog.MODE_GMAIL_API:
             reply = QMessageBox.question(
                 self,
                 "メール自動取得",
@@ -205,16 +205,12 @@ class MainWindow(QMainWindow):
             )
             
             if reply == QMessageBox.StandardButton.Yes:
-                # Gmail API使用確認
-                from utils.config import get_config
-                config = get_config()
-                use_gmail_api = config.get('email', {}).get('use_gmail_api', False)
-                
-                if use_gmail_api:
+                if self.process_mode == ProcessModeDialog.MODE_GMAIL_API:
+                    # Gmail API方式の場合
                     self.log_panel.append_log("Gmail APIを使用してメール監視を行います", "INFO")
-                    # Gmail APIの場合はパスワード不要
-                    email_password = "GMAIL_API"  # ダミー値（email_monitorプロパティで判定）
+                    email_password = "GMAIL_API"  # ダミー値（WorkflowProcessorで判定）
                 else:
+                    # 従来方式の場合
                     # 環境変数から取得を試みる
                     import os
                     email_password = os.getenv('GMAIL_APP_PASSWORD')
@@ -240,7 +236,12 @@ class MainWindow(QMainWindow):
         self.progress_panel.set_total_items(len(n_codes))
         
         # ログに開始を記録
-        mode_text = "API方式" if self.process_mode == ProcessModeDialog.MODE_API else "従来方式"
+        mode_text_map = {
+            ProcessModeDialog.MODE_API: "API方式",
+            ProcessModeDialog.MODE_TRADITIONAL: "従来方式",
+            ProcessModeDialog.MODE_GMAIL_API: "Gmail API方式"
+        }
+        mode_text = mode_text_map.get(self.process_mode, "不明")
         self.log_panel.append_log(f"処理を開始します（{mode_text}）", "INFO")
         for n_code in n_codes:
             self.log_panel.append_log(f"キューに追加: {n_code}", "INFO")

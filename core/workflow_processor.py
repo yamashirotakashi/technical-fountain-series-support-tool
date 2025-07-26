@@ -82,11 +82,13 @@ class WorkflowProcessor(QObject):
     
     @property
     def email_monitor(self):
-        """EmailMonitorの遅延初期化（設定に基づく実装選択）"""
+        """EmailMonitorの遅延初期化（処理方式に基づく実装選択）"""
         if self._email_monitor is None:
-            use_gmail_api = self.config.get('email', {}).get('use_gmail_api', False)
+            # Gmail API方式の判定（処理モードまたはパスワード値で判定）
+            is_gmail_api_mode = (self.process_mode == "gmail_api" or 
+                                self.email_password == "GMAIL_API")
             
-            if use_gmail_api:
+            if is_gmail_api_mode:
                 # Gmail API使用
                 self.logger.info("Gmail APIを使用してメール監視を初期化します")
                 from core.gmail_oauth_monitor import GmailOAuthMonitor
@@ -95,7 +97,7 @@ class WorkflowProcessor(QObject):
                 self._email_monitor.authenticate()
             else:
                 # 従来のIMAP使用（パスワードが必要）
-                if self.email_password:
+                if self.email_password and self.email_password != "GMAIL_API":
                     self.logger.info("IMAPを使用してメール監視を初期化します")
                     from core.email_monitor import EmailMonitor
                     self._email_monitor = EmailMonitor(self.email_address, self.email_password)
