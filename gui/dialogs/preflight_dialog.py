@@ -45,19 +45,9 @@ class PreflightWorker(QThread):
             # バッチ処理を実行
             results = self.batch_processor.process_batch(self.email)
             
-            # 結果をチェック
-            error_count = 0
-            for file_path, job in results.items():
-                if job.status == "error":
-                    error_count += 1
-                    filename = Path(file_path).name
-                    self.file_checked.emit(filename, True, job.error_message or "エラー")
-                    
+            # 結果をチェック（すでにリアルタイムで表示済み）
             if not self._cancelled:
-                if error_count == 0:
-                    self.status_updated.emit("✓ すべてのファイルがPDF変換可能です")
-                else:
-                    self.status_updated.emit(f"✗ チェック完了 - エラーファイル: {error_count}件")
+                self.status_updated.emit("検証処理が完了しました")
                 
         except Exception as e:
             self.logger.error(f"Pre-flight Checkエラー: {e}", exc_info=True)
@@ -85,6 +75,7 @@ class PreflightWorker(QThread):
             self.file_checked.emit(filename, True, job.error_message or "エラー")
             self.status_updated.emit(f"エラー: {filename} - {job.error_message}")
         elif job.status == "success":
+            self.file_checked.emit(filename, False, "成功")
             self.status_updated.emit(f"✓ 検証成功: {filename}")
             
     def _on_progress_updated(self, completed: int, total: int):
@@ -123,6 +114,12 @@ class PreflightDialog(QDialog):
         desc_label.setFont(QFont("メイリオ", 9))
         header_layout.addWidget(desc_label)
         
+        # 追加説明
+        info_label = QLabel("エラーが発見されたファイルはリアルタイムで表示されます")
+        info_label.setFont(QFont("メイリオ", 8))
+        info_label.setStyleSheet("color: gray;")
+        header_layout.addWidget(info_label)
+        
         layout.addLayout(header_layout)
         layout.addSpacing(10)
         
@@ -131,8 +128,8 @@ class PreflightDialog(QDialog):
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
         
-        # エラーファイルリスト
-        list_label = QLabel("検証結果:")
+        # 検証結果リスト
+        list_label = QLabel("検証結果: (✅ 成功 / ❌ エラー)")
         list_label.setFont(QFont("メイリオ", 10, QFont.Weight.Bold))
         layout.addWidget(list_label)
         
@@ -240,11 +237,16 @@ class PreflightDialog(QDialog):
         """ファイルチェック結果を受信"""
         if is_error:
             self.add_error_file(filename)
+        else:
+            # 成功したファイルも表示（緑色）
+            item = QListWidgetItem(f"✅ {filename}")
+            item.setForeground(Qt.GlobalColor.darkGreen)
+            self.error_list.addItem(item)
             
     @pyqtSlot(str)
     def add_error_file(self, filename):
         """エラーファイルを追加"""
-        item = QListWidgetItem(filename)
+        item = QListWidgetItem(f"❌ {filename}")
         item.setForeground(Qt.GlobalColor.red)
         self.error_list.addItem(item)
         
@@ -267,13 +269,27 @@ class PreflightDialog(QDialog):
     @pyqtSlot()
     def set_check_complete(self):
         """チェック完了を設定"""
-        error_count = self.error_list.count()
-        if error_count == 0:
-            self.status_label.setText("✓ すべてのファイルがPDF変換可能です")
+        total_files = self.error_list.count()
+        error_count = 0
+        success_count = 0
+        
+        # エラーと成功をカウント
+        for i in range(total_files):
+            item_text = self.error_list.item(i).text()
+            if item_text.startswith("❌"):
+                error_count += 1
+            elif item_text.startswith("✅"):
+                success_count += 1
+        
+        if error_count == 0 and success_count > 0:
+            self.status_label.setText(f"✓ すべてのファイルがPDF変換可能です ({success_count}件)")
             self.status_label.setStyleSheet("color: green;")
-        else:
-            self.status_label.setText(f"✗ チェック完了 - エラーファイル: {error_count}件")
+        elif error_count > 0:
+            self.status_label.setText(f"✗ チェック完了 - 成功: {success_count}件 / エラー: {error_count}件")
             self.status_label.setStyleSheet("color: red;")
+        else:
+            self.status_label.setText("チェック完了")
+            self.status_label.setStyleSheet("")
             
     @pyqtSlot()
     def clear_list(self):

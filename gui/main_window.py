@@ -442,9 +442,7 @@ class MainWindow(QMainWindow):
         self.preflight_dialog = PreflightDialog(self)
         self.preflight_dialog.show()
         
-        # TODO: Phase 2以降でPre-flight Check処理を実装
         self.log_panel.append_log("Pre-flight Check機能を起動しました", "INFO")
-        self.preflight_dialog.update_status("機能実装中...")
         
     @pyqtSlot(list, str)
     def on_warning_dialog_needed(self, messages, result_type):
