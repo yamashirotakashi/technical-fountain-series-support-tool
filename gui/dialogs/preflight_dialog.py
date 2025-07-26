@@ -7,8 +7,7 @@ from PyQt6.QtGui import QFont
 from pathlib import Path
 from typing import List, Optional
 
-from core.preflight.word2xhtml_scraper import Word2XhtmlScrapingVerifier
-from core.preflight.rate_limiter import RateLimiter
+from core.preflight.batch_processor import BatchProcessor, BatchJob
 from utils.logger import get_logger
 
 
@@ -25,9 +24,13 @@ class PreflightWorker(QThread):
         super().__init__()
         self.files = files
         self.email = email
-        self.verifier = Word2XhtmlScrapingVerifier()
+        self.batch_processor = BatchProcessor()
         self.logger = get_logger(__name__)
         self._cancelled = False
+        
+        # コールバックを設定
+        self.batch_processor.on_job_updated = self._on_job_updated
+        self.batch_processor.on_progress_updated = self._on_progress_updated
         
     def run(self):
         """Pre-flight Checkを実行"""
@@ -35,41 +38,57 @@ class PreflightWorker(QThread):
             total_files = len(self.files)
             self.status_updated.emit(f"検証開始: {total_files}ファイル")
             
-            # ファイルパスをバッチ送信
+            # ファイルを追加
             file_paths = [str(f) for f in self.files]
-            job_ids = self.verifier.submit_batch(file_paths, self.email)
+            self.batch_processor.add_files(file_paths)
             
-            # 送信結果をチェック
-            for i, (file_path, job_id) in enumerate(zip(file_paths, job_ids)):
-                if self._cancelled:
-                    break
-                    
-                filename = Path(file_path).name
-                progress = int((i + 1) / total_files * 100)
-                self.progress_updated.emit(progress)
-                
-                if not job_id:
-                    # 送信失敗
-                    self.file_checked.emit(filename, True, "アップロード失敗")
-                else:
-                    # 送信成功（結果は後で確認）
-                    self.status_updated.emit(f"送信完了: {filename}")
+            # バッチ処理を実行
+            results = self.batch_processor.process_batch(self.email)
+            
+            # 結果をチェック
+            error_count = 0
+            for file_path, job in results.items():
+                if job.status == "error":
+                    error_count += 1
+                    filename = Path(file_path).name
+                    self.file_checked.emit(filename, True, job.error_message or "エラー")
                     
             if not self._cancelled:
-                self.status_updated.emit("全ファイルの送信完了。メール待機中...")
-                # TODO: Phase 4でメール監視を実装
+                if error_count == 0:
+                    self.status_updated.emit("✓ すべてのファイルがPDF変換可能です")
+                else:
+                    self.status_updated.emit(f"✗ チェック完了 - エラーファイル: {error_count}件")
                 
         except Exception as e:
-            self.logger.error(f"Pre-flight Checkエラー: {e}")
+            self.logger.error(f"Pre-flight Checkエラー: {e}", exc_info=True)
             self.status_updated.emit(f"エラー: {str(e)}")
             
         finally:
-            self.verifier.cleanup()
             self.finished.emit()
             
     def cancel(self):
         """処理をキャンセル"""
         self._cancelled = True
+        self.batch_processor.cancel()
+        
+    def _on_job_updated(self, job: BatchJob):
+        """ジョブ更新時のコールバック"""
+        filename = Path(job.file_path).name
+        
+        if job.status == "uploading":
+            self.status_updated.emit(f"アップロード中: {filename}")
+        elif job.status == "uploaded":
+            self.status_updated.emit(f"アップロード完了: {filename}")
+        elif job.status == "error":
+            self.file_checked.emit(filename, True, job.error_message or "エラー")
+        elif job.status == "success":
+            self.status_updated.emit(f"検証成功: {filename}")
+            
+    def _on_progress_updated(self, completed: int, total: int):
+        """進捗更新時のコールバック"""
+        if total > 0:
+            progress = int(completed / total * 100)
+            self.progress_updated.emit(progress)
 
 
 class PreflightDialog(QDialog):

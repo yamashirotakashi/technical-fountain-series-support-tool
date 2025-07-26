@@ -3,6 +3,7 @@ import os
 import platform
 import zipfile
 import requests
+import re
 from pathlib import Path
 from typing import Optional
 from selenium import webdriver
@@ -28,31 +29,55 @@ class SeleniumDriverManager:
             if platform.system() == "Windows":
                 import winreg
                 try:
-                    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, 
-                                       r"Software\Google\Chrome\BLBeacon")
-                    version, _ = winreg.QueryValueEx(key, "version")
-                    winreg.CloseKey(key)
-                    return version
+                    # 複数の場所を確認
+                    locations = [
+                        (winreg.HKEY_CURRENT_USER, r"Software\Google\Chrome\BLBeacon"),
+                        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe"),
+                    ]
+                    
+                    for hkey, path in locations:
+                        try:
+                            key = winreg.OpenKey(hkey, path)
+                            if "BLBeacon" in path:
+                                version, _ = winreg.QueryValueEx(key, "version")
+                            else:
+                                # chrome.exeのパスから取得を試みる
+                                import subprocess
+                                exe_path, _ = winreg.QueryValueEx(key, "")
+                                result = subprocess.run([exe_path, "--version"], 
+                                                      capture_output=True, text=True)
+                                if result.returncode == 0:
+                                    # "Google Chrome 120.0.6099.129" のような形式から抽出
+                                    version_match = re.search(r'(\d+\.\d+\.\d+\.\d+)', result.stdout)
+                                    if version_match:
+                                        version = version_match.group(1)
+                            winreg.CloseKey(key)
+                            return version
+                        except:
+                            continue
                 except:
                     pass
                     
-            # macOS/Linux - 簡易的にデフォルトバージョンを返す
-            return "120.0.0.0"  # デフォルトバージョン
+            # macOS/Linux - 簡易的に最新の安定版を返す
+            return "131.0.6778.204"  # 2025年1月時点の安定版
             
         except Exception as e:
             self.logger.warning(f"Chromeバージョン取得失敗: {e}")
-            return "120.0.0.0"
+            return "131.0.6778.204"
     
     def _download_chromedriver(self, version: str) -> Path:
         """ChromeDriverをダウンロード"""
         system = platform.system().lower()
         if system == "windows":
+            platform_name = "win64"
             filename = "chromedriver-win64.zip"
             executable = "chromedriver.exe"
         elif system == "darwin":
+            platform_name = "mac-x64"
             filename = "chromedriver-mac-x64.zip"
             executable = "chromedriver"
         else:
+            platform_name = "linux64"
             filename = "chromedriver-linux64.zip"
             executable = "chromedriver"
             
@@ -61,7 +86,7 @@ class SeleniumDriverManager:
         base_url = "https://storage.googleapis.com/chrome-for-testing-public"
         
         # バージョンに応じたURLを構築
-        driver_url = f"{base_url}/{version}/{filename}"
+        driver_url = f"{base_url}/{version}/{platform_name}/{filename}"
         
         # ダウンロード先
         zip_path = self.driver_dir / filename
@@ -69,22 +94,57 @@ class SeleniumDriverManager:
         
         # 既にダウンロード済みならスキップ
         if driver_path.exists():
+            self.logger.info(f"ChromeDriverは既に存在します: {driver_path}")
             return driver_path
             
         try:
-            # ダウンロード
-            self.logger.info(f"ChromeDriverをダウンロード中: {driver_url}")
-            response = requests.get(driver_url, stream=True)
-            response.raise_for_status()
+            # まず正確なバージョンでダウンロードを試みる
+            urls_to_try = [
+                driver_url,
+                # バージョンが見つからない場合のフォールバック
+                f"{base_url}/LATEST_RELEASE_{major_version}/{platform_name}/{filename}",
+                # 最新の安定版
+                f"https://chromedriver.storage.googleapis.com/LATEST_RELEASE_{major_version}",
+            ]
             
-            with open(zip_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
+            for url in urls_to_try:
+                try:
+                    self.logger.info(f"ChromeDriverをダウンロード試行中: {url}")
+                    response = requests.get(url, stream=True, timeout=30)
+                    response.raise_for_status()
+                    
+                    # 最新バージョン番号の取得（LATEST_RELEASEの場合）
+                    if "LATEST_RELEASE" in url and response.headers.get('content-type', '').startswith('text/'):
+                        latest_version = response.text.strip()
+                        self.logger.info(f"最新バージョン: {latest_version}")
+                        # 新しいURLで再試行
+                        driver_url = f"{base_url}/{latest_version}/{platform_name}/{filename}"
+                        response = requests.get(driver_url, stream=True, timeout=30)
+                        response.raise_for_status()
+                    
+                    # ファイルをダウンロード
+                    with open(zip_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    break
+                except requests.exceptions.RequestException as e:
+                    self.logger.warning(f"ダウンロード失敗: {url} - {e}")
+                    continue
+            else:
+                raise Exception("すべてのダウンロードURLで失敗しました")
                     
             # 解凍
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                zip_ref.extractall(self.driver_dir)
-                
+                # chromedriver-win64/chromedriver.exe のような構造の場合に対応
+                for file_info in zip_ref.filelist:
+                    if file_info.filename.endswith(executable):
+                        # ファイル名だけを抽出してドライバーディレクトリに配置
+                        target_path = self.driver_dir / executable
+                        with zip_ref.open(file_info) as source, open(target_path, 'wb') as target:
+                            target.write(source.read())
+                        driver_path = target_path
+                        break
+                        
             # 実行権限を付与（Unix系）
             if platform.system() != "Windows":
                 os.chmod(driver_path, 0o755)
