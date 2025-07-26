@@ -145,6 +145,14 @@ class MainWindow(QMainWindow):
         # セパレータ
         tools_menu.addSeparator()
         
+        # Pre-flight Checkアクション
+        preflight_action = QAction("Pre-flight Check(&P)", self)
+        preflight_action.triggered.connect(self.show_preflight_check)
+        tools_menu.addAction(preflight_action)
+        
+        # セパレータ
+        tools_menu.addSeparator()
+        
         # リポジトリ設定アクション
         repo_settings_action = QAction("リポジトリ設定(&R)", self)
         repo_settings_action.triggered.connect(self.show_repository_settings)
@@ -416,6 +424,28 @@ class MainWindow(QMainWindow):
             self.log_panel.append_log(f"処理方式を変更: {mode_text}", "INFO")
             self.status_bar.showMessage(f"処理方式: {mode_text}")
     
+    @pyqtSlot()
+    def show_preflight_check(self):
+        """Pre-flight Checkダイアログを表示"""
+        from gui.dialogs.preflight_dialog import PreflightDialog
+        
+        # 現在処理中でないかチェック
+        if hasattr(self, 'worker_thread') and self.worker_thread.isRunning():
+            QMessageBox.warning(
+                self,
+                "処理中",
+                "現在処理中です。処理が完了してからPre-flight Checkを実行してください。"
+            )
+            return
+            
+        # ダイアログを作成して表示
+        self.preflight_dialog = PreflightDialog(self)
+        self.preflight_dialog.show()
+        
+        # TODO: Phase 2以降でPre-flight Check処理を実装
+        self.log_panel.append_log("Pre-flight Check機能を起動しました", "INFO")
+        self.preflight_dialog.update_status("機能実装中...")
+        
     @pyqtSlot(list, str)
     def on_warning_dialog_needed(self, messages, result_type):
         """API処理の警告ダイアログを表示"""
