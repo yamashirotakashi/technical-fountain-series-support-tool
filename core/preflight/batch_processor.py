@@ -11,6 +11,7 @@ from .verifier_base import PreflightVerifier
 from .word2xhtml_scraper import Word2XhtmlScrapingVerifier
 from .email_result_monitor import PreflightEmailResultMonitor
 from .state_manager import PreflightStateManager
+from .verifier_factory import VerifierFactory
 from utils.logger import get_logger
 
 
@@ -31,10 +32,10 @@ class BatchProcessor:
     def __init__(self, verifier: Optional[PreflightVerifier] = None):
         """
         Args:
-            verifier: 使用するVerifier（Noneの場合はデフォルト）
+            verifier: 使用するVerifier（Noneの場合はファクトリーから生成）
         """
         self.logger = get_logger(__name__)
-        self.verifier = verifier or Word2XhtmlScrapingVerifier()
+        self.verifier = verifier or VerifierFactory.create_verifier()
         self.state_manager = PreflightStateManager()
         self.jobs: Dict[str, BatchJob] = {}
         self._lock = threading.Lock()
