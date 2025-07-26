@@ -273,8 +273,9 @@ class WorkflowProcessor(QObject):
             # download_pathは変換済みファイルのパス
             
         else:
-            # 従来方式の処理
-            self.emit_log("従来方式で処理を開始...", "INFO")
+            # 従来方式またはGmail API方式の処理
+            mode_text = "Gmail API方式" if self.process_mode == "gmail_api" else "従来方式"
+            self.emit_log(f"{mode_text}で処理を開始...", "INFO")
             
             # ファイルをアップロード
             self.emit_log("ファイルをアップロード中...", "INFO")
