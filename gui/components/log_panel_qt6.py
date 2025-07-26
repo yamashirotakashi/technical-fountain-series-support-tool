@@ -24,7 +24,7 @@ class LogPanel(QWidget):
         layout = QVBoxLayout(self)
         
         # Group box
-        group_box = QGroupBox("処理ログ")
+        group_box = QGroupBox("Processing Log")
         group_box.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;

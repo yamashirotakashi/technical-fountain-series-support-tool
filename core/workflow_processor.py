@@ -413,6 +413,7 @@ class WorkflowProcessor(QObject):
     
     def on_file_placement_confirmed(self, selected_files: List[Path]):
         """ファイル配置確認の結果を受信"""
+        print(f"[DEBUG] WorkflowProcessor.on_file_placement_confirmed: 受信したファイル数: {len(selected_files)}")
         self.file_placement_result = selected_files
         self.emit_log(f"ファイル配置確認結果: {len(selected_files)}個のファイルを選択", "INFO")
     

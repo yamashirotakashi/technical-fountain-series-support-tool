@@ -1,4 +1,4 @@
-﻿"""シンプルな警告ダイアログ（QMessageBoxベース）"""
+"""シンプルな警告ダイアログ（MessageBoxベース）"""
 from PyQt6.QtWidgets import QMessageBox, QTextEdit, QVBoxLayout
 from PyQt6.QtCore import Qt
 
@@ -17,11 +17,11 @@ def show_warning_dialog(parent, messages, result_type="warning"):
     # タイトルとアイコンを設定
     if result_type == "error":
         msg_box.setWindowTitle("変換エラー")
-        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setIcon(QMessageBox.Icon.Critical)
         msg_box.setText("変換処理が失敗しました")
     else:
         msg_box.setWindowTitle("変換警告")
-        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
         msg_box.setText("変換処理は成功しましたが、警告があります")
     
     # 詳細メッセージを設定

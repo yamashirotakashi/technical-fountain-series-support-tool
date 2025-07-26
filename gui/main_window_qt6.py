@@ -39,10 +39,6 @@ class ProcessWorker(QThread):
     
     def run(self):
         try:
-            # デバッグ用ログ
-            print(f"[DEBUG] ProcessWorker.run: process_mode={self.process_mode}")
-            print(f"[DEBUG] ProcessWorker.run: email_password={'set' if self.email_password else 'not set'}")
-            
             self.workflow_processor = WorkflowProcessor(
                 email_password=self.email_password,
                 process_mode=self.process_mode
@@ -56,18 +52,22 @@ class ProcessWorker(QThread):
             self.workflow_processor.file_placement_confirmation_needed.connect(self.file_placement_confirmation_needed.emit)
             self.workflow_processor.warning_dialog_needed.connect(self.warning_dialog_needed.emit)
             
-            # API processorは WorkflowProcessor内で自動的に管理される
+            if self.process_mode == ProcessModeDialog.MODE_API:
+                self.api_processor = ApiProcessor()
+                self.api_processor.log_message.connect(self.log_message.emit)
+                self.api_processor.status_updated.connect(self.status_updated.emit)
+                self.api_processor.progress_updated.connect(self.progress_updated.emit)
+                self.workflow_processor.set_api_processor(self.api_processor)
             
-            self.workflow_processor.process_n_codes(self.n_codes)
-            success = True
+            success = self.workflow_processor.process(self.n_codes)
             
             if success:
-                self.log_message.emit("SUCCESS", "処理が正常に完了しました")
+                self.log_message.emit("SUCCESS", "Process completed successfully")
             else:
-                self.log_message.emit("ERROR", "処理が失敗しました")
+                self.log_message.emit("ERROR", "Process failed")
         except Exception as e:
             self.logger.error(f"Worker error: {e}", exc_info=True)
-            self.log_message.emit("ERROR", f"エラー: {str(e)}")
+            self.log_message.emit("ERROR", f"Error: {str(e)}")
         finally:
             self.finished.emit()
 
@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         self.connect_signals()
     
     def setup_ui(self):
-        self.setWindowTitle("技術の泉シリーズ制作支援ツール")
+        self.setWindowTitle("Technical Fountain Series Support Tool")
         self.setGeometry(100, 100, 1200, 800)
         
         central_widget = QWidget()
@@ -115,58 +115,54 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
         
         # File menu
-        file_menu = menubar.addMenu("ファイル(&F)")
+        file_menu = menubar.addMenu("File(&F)")
         
-        exit_action = QAction("終了(&X)", self)
+        exit_action = QAction("Exit(&X)", self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
         # Tools menu
-        tools_menu = menubar.addMenu("ツール(&T)")
+        tools_menu = menubar.addMenu("Tools(&T)")
         
-        clear_log_action = QAction("ログをクリア(&C)", self)
+        clear_log_action = QAction("Clear Log(&C)", self)
         clear_log_action.triggered.connect(self.log_panel.clear_logs)
         tools_menu.addAction(clear_log_action)
         
         tools_menu.addSeparator()
         
-        repo_settings_action = QAction("リポジトリ設定(&R)", self)
+        repo_settings_action = QAction("Repository Settings(&R)", self)
         repo_settings_action.triggered.connect(self.show_repository_settings)
         tools_menu.addAction(repo_settings_action)
         
         # Help menu
-        help_menu = menubar.addMenu("ヘルプ(&H)")
+        help_menu = menubar.addMenu("Help(&H)")
         
-        about_action = QAction("このアプリケーションについて(&A)", self)
+        about_action = QAction("About(&A)", self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
     
     def setup_statusbar(self):
-        self.statusBar().showMessage("準備完了")
+        self.statusBar().showMessage("Ready")
     
     def connect_signals(self):
         self.input_panel.processing_requested.connect(self.start_processing)
         self.input_panel.settings_requested.connect(self.show_repository_settings)
         self.progress_panel.cancel_requested.connect(self.cancel_processing)
     
-    @pyqtSlot(list, str)
+    @pyqtSlot(list, int)
     def start_processing(self, n_codes, process_mode):
         if self.worker_thread and self.worker_thread.isRunning():
-            QMessageBox.warning(self, "警告", "処理が既に実行中です")
+            QMessageBox.warning(self, "Warning", "Processing is already in progress")
             return
-        
-        # デバッグ用ログ
-        print(f"[DEBUG] start_processing: process_mode={process_mode}, type={type(process_mode)}")
-        print(f"[DEBUG] MODE_API={ProcessModeDialog.MODE_API}, MODE_TRADITIONAL={ProcessModeDialog.MODE_TRADITIONAL}")
         
         self.process_mode = process_mode
         
         if process_mode == ProcessModeDialog.MODE_TRADITIONAL:
             email, ok = QInputDialog.getText(
                 self, 
-                "メールパスワード",
-                "Gmailアプリパスワードを入力してください:",
+                "Email Password",
+                "Enter Gmail app password:",
                 QLineEdit.EchoMode.Password
             )
             if not ok or not email:
@@ -176,7 +172,7 @@ class MainWindow(QMainWindow):
         
         self.input_panel.set_enabled(False)
         self.progress_panel.reset_progress()
-        self.log_panel.add_log("INFO", "処理を開始しています...")
+        self.log_panel.add_log("INFO", "Starting process...")
         
         self.worker_thread = ProcessWorker(n_codes, email, process_mode)
         self.worker_thread.log_message.connect(self.log_panel.add_log)
@@ -195,14 +191,14 @@ class MainWindow(QMainWindow):
         if self.worker_thread and self.worker_thread.isRunning():
             self.worker_thread.terminate()
             self.worker_thread.wait()
-            self.log_panel.add_log("WARNING", "処理がキャンセルされました")
+            self.log_panel.add_log("WARNING", "Process cancelled")
             self.processing_finished()
     
     @pyqtSlot()
     def processing_finished(self):
         self.input_panel.set_enabled(True)
         self.progress_panel.set_cancel_enabled(False)
-        self.statusBar().showMessage("準備完了")
+        self.statusBar().showMessage("Ready")
     
     @pyqtSlot(str, str)
     def handle_confirmation(self, title, message):
@@ -216,24 +212,22 @@ class MainWindow(QMainWindow):
     
     @pyqtSlot(object, str, object)
     def handle_folder_selection(self, repo_path, repo_name, default_folder):
-        # FolderSelectorDialogの引数順序: repo_path, repo_name, default_folder, parent
-        dialog = FolderSelectorDialog(repo_path, repo_name, default_folder, self)
+        dialog = FolderSelectorDialog(self, repo_path, repo_name, default_folder)
         if dialog.exec():
-            selected_folder = dialog.selected_folder
-            if self.worker_thread and self.worker_thread.workflow_processor:
-                self.worker_thread.workflow_processor.set_selected_work_folder(str(selected_folder))
+            selected_folder = dialog.get_selected_folder()
+            if self.worker_thread and hasattr(self.worker_thread.workflow_processor, 'folder_selection_callback'):
+                self.worker_thread.workflow_processor.folder_selection_callback(selected_folder)
         else:
-            if self.worker_thread and self.worker_thread.workflow_processor:
-                self.worker_thread.workflow_processor.set_selected_work_folder(None)
+            if self.worker_thread and hasattr(self.worker_thread.workflow_processor, 'folder_selection_callback'):
+                self.worker_thread.workflow_processor.folder_selection_callback(None)
     
     @pyqtSlot(str, list, object)
     def handle_file_placement_confirmation(self, honbun_folder_path, file_list, callback):
-        dialog = SimpleFileSelectorDialog(file_list, self)
+        dialog = SimpleFileSelectorDialog(self, honbun_folder_path, file_list)
         if dialog.exec():
-            selected_files = dialog.get_selected_files()
-            callback(selected_files)
+            callback(True)
         else:
-            callback([])
+            callback(False)
     
     @pyqtSlot(list, str)
     def handle_warning_dialog(self, messages, result_type):
@@ -246,15 +240,15 @@ class MainWindow(QMainWindow):
         dialog.exec()
     
     def show_about(self):
-        QMessageBox.about(self, "このアプリケーションについて",
-                         "技術の泉シリーズ制作支援ツール\n\n"
-                         "バージョン 1.0.0\n\n"
-                         "技術の泉シリーズの制作プロセスを自動化します")
+        QMessageBox.about(self, "About",
+                         "Technical Fountain Series Support Tool\n\n"
+                         "Version 1.0.0\n\n"
+                         "Automates the production process of Technical Fountain Series")
     
     def closeEvent(self, event):
         if self.worker_thread and self.worker_thread.isRunning():
-            reply = QMessageBox.question(self, "終了確認",
-                                       "処理が実行中です。終了しますか？",
+            reply = QMessageBox.question(self, "Confirm Exit",
+                                       "Processing is in progress. Do you want to exit?",
                                        QMessageBox.StandardButton.Yes | 
                                        QMessageBox.StandardButton.No)
             

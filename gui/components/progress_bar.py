@@ -1,17 +1,17 @@
-﻿"""進捗表示バーモジュール"""
+﻿"""騾ｲ謐苓｡ｨ遉ｺ繝舌・繝｢繧ｸ繝･繝ｼ繝ｫ"""
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QProgressBar, QLabel, QHBoxLayout
 from PyQt6.QtCore import Qt, pyqtSlot
 
 
 class ProgressPanel(QWidget):
-    """進捗表示パネルウィジェット"""
+    """騾ｲ謐苓｡ｨ遉ｺ繝代ロ繝ｫ繧ｦ繧｣繧ｸ繧ｧ繝・ヨ"""
     
     def __init__(self, parent=None):
         """
-        ProgressPanelを初期化
+        ProgressPanel繧貞・譛溷喧
         
         Args:
-            parent: 親ウィジェット
+            parent: 隕ｪ繧ｦ繧｣繧ｸ繧ｧ繝・ヨ
         """
         super().__init__(parent)
         self.total_items = 0
@@ -19,11 +19,11 @@ class ProgressPanel(QWidget):
         self.setup_ui()
     
     def setup_ui(self):
-        """UIを構築"""
+        """UI繧呈ｧ狗ｯ・""
         layout = QVBoxLayout(self)
         
-        # 状態ラベル
-        self.status_label = QLabel("待機中...")
+        # 迥ｶ諷九Λ繝吶Ν
+        self.status_label = QLabel("蠕・ｩ滉ｸｭ...")
         self.status_label.setStyleSheet("""
             QLabel {
                 font-size: 10pt;
@@ -32,7 +32,7 @@ class ProgressPanel(QWidget):
             }
         """)
         
-        # プログレスバー
+        # 繝励Ο繧ｰ繝ｬ繧ｹ繝舌・
         self.progress_bar = QProgressBar()
         self.progress_bar.setMinimum(0)
         self.progress_bar.setMaximum(100)
@@ -51,7 +51,7 @@ class ProgressPanel(QWidget):
             }
         """)
         
-        # 詳細ラベル
+        # 隧ｳ邏ｰ繝ｩ繝吶Ν
         detail_layout = QHBoxLayout()
         self.detail_label = QLabel("")
         self.detail_label.setStyleSheet("""
@@ -72,7 +72,7 @@ class ProgressPanel(QWidget):
         detail_layout.addStretch()
         detail_layout.addWidget(self.time_label)
         
-        # レイアウトに追加
+        # 繝ｬ繧､繧｢繧ｦ繝医↓霑ｽ蜉
         layout.addWidget(self.status_label)
         layout.addWidget(self.progress_bar)
         layout.addLayout(detail_layout)
@@ -80,11 +80,10 @@ class ProgressPanel(QWidget):
     @pyqtSlot(int, int)
     def set_total_items(self, total: int, current: int = 0):
         """
-        処理する総アイテム数を設定
-        
+        蜃ｦ逅・☆繧狗ｷ上い繧､繝・Β謨ｰ繧定ｨｭ螳・        
         Args:
-            total: 総アイテム数
-            current: 現在のアイテム番号
+            total: 邱上い繧､繝・Β謨ｰ
+            current: 迴ｾ蝨ｨ縺ｮ繧｢繧､繝・Β逡ｪ蜿ｷ
         """
         self.total_items = total
         self.current_item = current
@@ -95,20 +94,17 @@ class ProgressPanel(QWidget):
     @pyqtSlot(int)
     def update_progress(self, value: int):
         """
-        進捗を更新
+        騾ｲ謐励ｒ譖ｴ譁ｰ
         
         Args:
-            value: 進捗値（0-100またはアイテム番号）
-        """
+            value: 騾ｲ謐怜､・・-100縺ｾ縺溘・繧｢繧､繝・Β逡ｪ蜿ｷ・・        """
         if self.total_items > 0:
-            # アイテム番号として処理
-            self.current_item = value
+            # 繧｢繧､繝・Β逡ｪ蜿ｷ縺ｨ縺励※蜃ｦ逅・            self.current_item = value
             self.progress_bar.setValue(value)
             percentage = int((value / self.total_items) * 100)
             self.progress_bar.setFormat(f"{percentage}%")
         else:
-            # パーセンテージとして処理
-            self.progress_bar.setValue(value)
+            # 繝代・繧ｻ繝ｳ繝・・繧ｸ縺ｨ縺励※蜃ｦ逅・            self.progress_bar.setValue(value)
             self.progress_bar.setFormat(f"{value}%")
         
         self.update_detail_label()
@@ -116,35 +112,35 @@ class ProgressPanel(QWidget):
     @pyqtSlot(str)
     def update_status(self, message: str):
         """
-        状態メッセージを更新
+        迥ｶ諷九Γ繝・そ繝ｼ繧ｸ繧呈峩譁ｰ
         
         Args:
-            message: 状態メッセージ
+            message: 迥ｶ諷九Γ繝・そ繝ｼ繧ｸ
         """
         self.status_label.setText(message)
     
     @pyqtSlot(str)
     def update_time(self, time_str: str):
         """
-        経過時間を更新
+        邨碁℃譎る俣繧呈峩譁ｰ
         
         Args:
-            time_str: 時間文字列
+            time_str: 譎る俣譁・ｭ怜・
         """
         self.time_label.setText(time_str)
     
     def update_detail_label(self):
-        """詳細ラベルを更新"""
+        """隧ｳ邏ｰ繝ｩ繝吶Ν繧呈峩譁ｰ"""
         if self.total_items > 0:
-            self.detail_label.setText(f"{self.current_item}/{self.total_items} 処理中")
+            self.detail_label.setText(f"{self.current_item}/{self.total_items} 蜃ｦ逅・ｸｭ")
         else:
             self.detail_label.setText("")
     
     def reset(self):
-        """進捗をリセット"""
+        """騾ｲ謐励ｒ繝ｪ繧ｻ繝・ヨ"""
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("%p%")
-        self.status_label.setText("待機中...")
+        self.status_label.setText("蠕・ｩ滉ｸｭ...")
         self.detail_label.setText("")
         self.time_label.setText("")
         self.total_items = 0
@@ -152,10 +148,9 @@ class ProgressPanel(QWidget):
     
     def set_indeterminate(self, is_indeterminate: bool):
         """
-        不確定進捗モードを設定
-        
+        荳咲｢ｺ螳夐ｲ謐励Δ繝ｼ繝峨ｒ險ｭ螳・        
         Args:
-            is_indeterminate: 不確定モードにする場合True
+            is_indeterminate: 荳咲｢ｺ螳壹Δ繝ｼ繝峨↓縺吶ｋ蝣ｴ蜷・rue
         """
         if is_indeterminate:
             self.progress_bar.setMaximum(0)

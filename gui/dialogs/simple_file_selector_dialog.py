@@ -86,6 +86,7 @@ class SimpleFileSelectorDialog(QDialog):
         self.selected_files = [
             cb.file_path for cb in self.checkboxes if cb.isChecked()
         ]
+        print(f"[DEBUG] SimpleFileSelectorDialog: 選択されたファイル数: {len(self.selected_files)}")
         if not self.selected_files:
             # 何も選択されていない場合は何もしない
             return

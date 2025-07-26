@@ -11,7 +11,7 @@ class InputPanel(QWidget):
     """N-code input panel widget"""
     
     # Custom signals
-    processing_requested = pyqtSignal(list, str)  # Send N-code list and process mode (string)
+    processing_requested = pyqtSignal(list, int)  # Send N-code list and process mode
     settings_requested = pyqtSignal()  # Settings button clicked
     
     def __init__(self, parent=None):
@@ -29,7 +29,7 @@ class InputPanel(QWidget):
         layout = QVBoxLayout(self)
         
         # Group box
-        group_box = QGroupBox("Nコード入力")
+        group_box = QGroupBox("N-Code Input")
         group_box.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
@@ -49,9 +49,9 @@ class InputPanel(QWidget):
         
         # Description label
         description_label = QLabel(
-            "処理したいNコードを入力してください。\n"
-            "複数のコードはカンマ (,)、タブ、スペース、改行で区切ることができます。\n"
-            "例: N00001, N00002 または N00001[Tab]N00002 または1行ずつ"
+            "Enter the N-codes you want to process.\n"
+            "Multiple codes can be separated by comma (,), tab, space, or newline.\n"
+            "Example: N00001, N00002 or N00001[Tab]N00002 or one per line"
         )
         description_label.setStyleSheet("color: #666; margin-bottom: 10px;")
         
@@ -76,7 +76,7 @@ class InputPanel(QWidget):
         button_layout = QHBoxLayout()
         
         # Process button
-        self.process_button = QPushButton("処理を開始")
+        self.process_button = QPushButton("Start Processing")
         self.process_button.clicked.connect(self.on_process_clicked)
         self.process_button.setStyleSheet("""
             QPushButton {
@@ -101,7 +101,7 @@ class InputPanel(QWidget):
         """)
         
         # Clear button
-        self.clear_button = QPushButton("クリア")
+        self.clear_button = QPushButton("Clear")
         self.clear_button.clicked.connect(self.clear_input)
         self.clear_button.setStyleSheet("""
             QPushButton {
@@ -122,7 +122,7 @@ class InputPanel(QWidget):
         """)
         
         # Settings button
-        self.settings_button = QPushButton("設定")
+        self.settings_button = QPushButton("Settings")
         self.settings_button.clicked.connect(self.on_settings_clicked)
         self.settings_button.setStyleSheet("""
             QPushButton {
@@ -179,16 +179,16 @@ class InputPanel(QWidget):
         valid_codes, errors = Validators.validate_n_codes(text)
         
         if not text.strip():
-            self.show_error("Nコードを入力してください。")
+            self.show_error("Please enter N-codes.")
             return False
         
         if errors:
-            error_message = "入力エラー:\n" + "\n".join(errors)
+            error_message = "Input errors:\n" + "\n".join(errors)
             self.show_error(error_message)
             return False
         
         if not valid_codes:
-            self.show_error("有効なNコードが入力されていません。")
+            self.show_error("No valid N-codes entered.")
             return False
         
         return True
@@ -215,7 +215,7 @@ class InputPanel(QWidget):
     def show_error(self, message: str):
         """Show error message"""
         from PyQt6.QtWidgets import QMessageBox
-        QMessageBox.critical(self, "入力エラー", message)
+        QMessageBox.critical(self, "Input Error", message)
     
     def set_enabled(self, enabled: bool):
         """Set panel enabled/disabled"""

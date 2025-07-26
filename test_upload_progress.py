@@ -5,8 +5,8 @@
 import sys
 import time
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QTextEdit, QProgressBar, QLabel
-from PyQt6.QtCore import QThread, pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QTextEdit, QProgressBar, QLabel
+from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
 
 # プロジェクトのパスを追加
 sys.path.insert(0, str(Path(__file__).parent))
@@ -132,4 +132,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = TestWindow()
     window.show()
-    sys.exit(app.exec())
+    sys.exit(app.exec_())

@@ -3,7 +3,7 @@
 警告ダイアログの単体テスト
 """
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget
 from gui.dialogs.warning_dialog import WarningDialog
 
 class TestWindow(QMainWindow):
@@ -37,7 +37,7 @@ class TestWindow(QMainWindow):
             "警告: バージョンが古い可能性があります"
         ]
         dialog = WarningDialog(messages, "partial_success", self)
-        result = dialog.exec()
+        result = dialog.exec_()
         print(f"ダイアログ結果: {result}")
     
     def show_error_dialog(self):
@@ -47,11 +47,11 @@ class TestWindow(QMainWindow):
             "エラー: ファイルが破損しています"
         ]
         dialog = WarningDialog(messages, "error", self)
-        result = dialog.exec()
+        result = dialog.exec_()
         print(f"ダイアログ結果: {result}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = TestWindow()
     window.show()
-    sys.exit(app.exec())
+    sys.exit(app.exec_())

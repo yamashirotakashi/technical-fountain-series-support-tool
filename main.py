@@ -25,12 +25,8 @@ def main():
     logger = get_logger(__name__)
     logger.info("アプリケーションを起動します")
     
-    # High DPI対応
-    try:
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
-        QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
-    except AttributeError:
-        pass  # PyQt5の古いバージョンでは利用できない場合がある
+    # High DPI対応（Qt6では自動的に有効）
+    # Qt6ではこれらの属性は削除されているため、設定不要
     
     # アプリケーションを作成
     app = QApplication(sys.argv)

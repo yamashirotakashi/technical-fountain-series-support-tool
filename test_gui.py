@@ -9,8 +9,8 @@ if 'DISPLAY' not in os.environ:
     os.environ['DISPLAY'] = ':0'
 
 try:
-    from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel
-    from PyQt6.QtCore import Qt
+    from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel
+    from PyQt5.QtCore import Qt
     
     app = QApplication(sys.argv)
     
@@ -19,11 +19,11 @@ try:
     window.setGeometry(100, 100, 400, 300)
     
     label = QLabel("PyQt5が正しく動作しています！", window)
-    label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    label.setAlignment(Qt.AlignCenter)
     window.setCentralWidget(label)
     
     window.show()
-    sys.exit(app.exec())
+    sys.exit(app.exec_())
     
 except Exception as e:
     print(f"エラー: {e}")

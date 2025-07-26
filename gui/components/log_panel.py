@@ -1,4 +1,4 @@
-﻿"""ログ表示パネルモジュール"""
+﻿"""繝ｭ繧ｰ陦ｨ遉ｺ繝代ロ繝ｫ繝｢繧ｸ繝･繝ｼ繝ｫ"""
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QTextCursor, QColor, QTextCharFormat
@@ -7,24 +7,24 @@ from pathlib import Path
 
 
 class LogPanel(QWidget):
-    """ログを表示するパネルウィジェット"""
+    """繝ｭ繧ｰ繧定｡ｨ遉ｺ縺吶ｋ繝代ロ繝ｫ繧ｦ繧｣繧ｸ繧ｧ繝・ヨ"""
     
     def __init__(self, parent=None):
         """
-        LogPanelを初期化
+        LogPanel繧貞・譛溷喧
         
         Args:
-            parent: 親ウィジェット
+            parent: 隕ｪ繧ｦ繧｣繧ｸ繧ｧ繝・ヨ
         """
         super().__init__(parent)
         self.auto_scroll = True
         self.setup_ui()
     
     def setup_ui(self):
-        """UIを構築"""
+        """UI繧呈ｧ狗ｯ・""
         layout = QVBoxLayout(self)
         
-        # ログ表示エリア
+        # 繝ｭ繧ｰ陦ｨ遉ｺ繧ｨ繝ｪ繧｢
         self.log_display = QTextEdit()
         self.log_display.setReadOnly(True)
         self.log_display.setStyleSheet("""
@@ -39,11 +39,10 @@ class LogPanel(QWidget):
             }
         """)
         
-        # ボタンレイアウト
-        button_layout = QHBoxLayout()
+        # 繝懊ち繝ｳ繝ｬ繧､繧｢繧ｦ繝・        button_layout = QHBoxLayout()
         
-        # クリアボタン
-        self.clear_button = QPushButton("ログクリア")
+        # 繧ｯ繝ｪ繧｢繝懊ち繝ｳ
+        self.clear_button = QPushButton("繝ｭ繧ｰ繧ｯ繝ｪ繧｢")
         self.clear_button.clicked.connect(self.clear_logs)
         self.clear_button.setStyleSheet("""
             QPushButton {
@@ -58,8 +57,8 @@ class LogPanel(QWidget):
             }
         """)
         
-        # 自動スクロールトグルボタン
-        self.auto_scroll_button = QPushButton("自動スクロール: ON")
+        # 閾ｪ蜍輔せ繧ｯ繝ｭ繝ｼ繝ｫ繝医げ繝ｫ繝懊ち繝ｳ
+        self.auto_scroll_button = QPushButton("閾ｪ蜍輔せ繧ｯ繝ｭ繝ｼ繝ｫ: ON")
         self.auto_scroll_button.setCheckable(True)
         self.auto_scroll_button.setChecked(True)
         self.auto_scroll_button.clicked.connect(self.toggle_auto_scroll)
@@ -82,8 +81,8 @@ class LogPanel(QWidget):
             }
         """)
         
-        # 保存ボタン
-        self.save_button = QPushButton("ログ保存")
+        # 菫晏ｭ倥・繧ｿ繝ｳ
+        self.save_button = QPushButton("繝ｭ繧ｰ菫晏ｭ・)
         self.save_button.clicked.connect(self.save_logs)
         self.save_button.setStyleSheet("""
             QPushButton {
@@ -109,20 +108,18 @@ class LogPanel(QWidget):
     @pyqtSlot(str, str)
     def append_log(self, message: str, level: str = "INFO"):
         """
-        ログメッセージを追加
+        繝ｭ繧ｰ繝｡繝・そ繝ｼ繧ｸ繧定ｿｽ蜉
         
         Args:
-            message: ログメッセージ
-            level: ログレベル
+            message: 繝ｭ繧ｰ繝｡繝・そ繝ｼ繧ｸ
+            level: 繝ｭ繧ｰ繝ｬ繝吶Ν
         """
         timestamp = datetime.now().strftime("%H:%M:%S")
         
-        # カーソルを取得
-        cursor = self.log_display.textCursor()
+        # 繧ｫ繝ｼ繧ｽ繝ｫ繧貞叙蠕・        cursor = self.log_display.textCursor()
         cursor.movePosition(QTextCursor.End)
         
-        # レベルに応じた色を設定
-        level_colors = {
+        # 繝ｬ繝吶Ν縺ｫ蠢懊§縺溯牡繧定ｨｭ螳・        level_colors = {
             "DEBUG": QColor("#808080"),
             "INFO": QColor("#ffffff"),
             "WARNING": QColor("#ffcc00"),
@@ -130,58 +127,58 @@ class LogPanel(QWidget):
             "CRITICAL": QColor("#ff0000")
         }
         
-        # タイムスタンプを追加
+        # 繧ｿ繧､繝繧ｹ繧ｿ繝ｳ繝励ｒ霑ｽ蜉
         timestamp_format = QTextCharFormat()
         timestamp_format.setForeground(QColor("#888888"))
         cursor.setCharFormat(timestamp_format)
         cursor.insertText(f"[{timestamp}] ")
         
-        # レベルを追加
+        # 繝ｬ繝吶Ν繧定ｿｽ蜉
         level_format = QTextCharFormat()
         level_format.setForeground(level_colors.get(level, QColor("#ffffff")))
         cursor.setCharFormat(level_format)
         cursor.insertText(f"{level}: ")
         
-        # メッセージを追加
+        # 繝｡繝・そ繝ｼ繧ｸ繧定ｿｽ蜉
         message_format = QTextCharFormat()
         message_format.setForeground(QColor("#ffffff"))
         cursor.setCharFormat(message_format)
         cursor.insertText(f"{message}\n")
         
-        # 自動スクロール
+        # 閾ｪ蜍輔せ繧ｯ繝ｭ繝ｼ繝ｫ
         if self.auto_scroll:
             self.log_display.setTextCursor(cursor)
             self.log_display.ensureCursorVisible()
     
     def clear_logs(self):
-        """ログをクリア"""
+        """繝ｭ繧ｰ繧偵け繝ｪ繧｢"""
         self.log_display.clear()
     
     def toggle_auto_scroll(self):
-        """自動スクロールの切り替え"""
+        """閾ｪ蜍輔せ繧ｯ繝ｭ繝ｼ繝ｫ縺ｮ蛻・ｊ譖ｿ縺・""
         self.auto_scroll = self.auto_scroll_button.isChecked()
-        text = "自動スクロール: ON" if self.auto_scroll else "自動スクロール: OFF"
+        text = "閾ｪ蜍輔せ繧ｯ繝ｭ繝ｼ繝ｫ: ON" if self.auto_scroll else "閾ｪ蜍輔せ繧ｯ繝ｭ繝ｼ繝ｫ: OFF"
         self.auto_scroll_button.setText(text)
     
     def save_logs(self):
-        """ログをファイルに保存"""
+        """繝ｭ繧ｰ繧偵ヵ繧｡繧､繝ｫ縺ｫ菫晏ｭ・""
         from PyQt6.QtWidgets import QFileDialog
         
-        # ファイル保存ダイアログ
+        # 繝輔ぃ繧､繝ｫ菫晏ｭ倥ム繧､繧｢繝ｭ繧ｰ
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         default_filename = f"technical_fountain_log_{timestamp}.txt"
         
         file_path, _ = QFileDialog.getSaveFileName(
             self,
-            "ログファイルの保存",
+            "繝ｭ繧ｰ繝輔ぃ繧､繝ｫ縺ｮ菫晏ｭ・,
             default_filename,
-            "テキストファイル (*.txt);;すべてのファイル (*.*)"
+            "繝・く繧ｹ繝医ヵ繧｡繧､繝ｫ (*.txt);;縺吶∋縺ｦ縺ｮ繝輔ぃ繧､繝ｫ (*.*)"
         )
         
         if file_path:
             try:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(self.log_display.toPlainText())
-                self.append_log(f"ログを保存しました: {file_path}", "INFO")
+                self.append_log(f"繝ｭ繧ｰ繧剃ｿ晏ｭ倥＠縺ｾ縺励◆: {file_path}", "INFO")
             except Exception as e:
-                self.append_log(f"ログの保存に失敗しました: {e}", "ERROR")
+                self.append_log(f"繝ｭ繧ｰ縺ｮ菫晏ｭ倥↓螟ｱ謨励＠縺ｾ縺励◆: {e}", "ERROR")

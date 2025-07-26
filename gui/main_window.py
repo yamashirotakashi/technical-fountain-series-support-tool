@@ -1,7 +1,7 @@
 ﻿"""メインウィンドウモジュール"""
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QSplitter, QMenuBar, QStatusBar, QMessageBox,
-                             QInputDialog, QLineEdit)
+                             QInputDialog, QLineEdit, QDialog)
 from PyQt6.QtCore import Qt, pyqtSlot, QThread, pyqtSignal, QCoreApplication
 from PyQt6.QtGui import QIcon, QAction
 
@@ -75,7 +75,7 @@ class MainWindow(QMainWindow):
         """MainWindowを初期化"""
         super().__init__()
         self.worker_thread = None
-        self.process_mode = ProcessModeDialog.MODE_TRADITIONAL  # デフォルトは従来方式
+        self.process_mode = ProcessModeDialog.MODE_API  # デフォルトはAPI方式
         self.setup_ui()
         self.setup_menu()
         self.setup_statusbar()
@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
     def connect_signals(self):
         """シグナルを接続"""
         # 入力パネルからのシグナル
-        self.input_panel.process_requested.connect(self.start_processing)
+        self.input_panel.processing_requested.connect(self.start_processing)
         self.input_panel.settings_requested.connect(self.show_process_mode_dialog)
     
     @pyqtSlot(list)
@@ -319,7 +319,7 @@ class MainWindow(QMainWindow):
         
         # ダイアログを表示
         result = dialog.exec()
-        if result != dialog.Accepted:
+        if result != QDialog.DialogCode.Accepted:
             # キャンセルされた場合
             self.log_panel.append_log("フォルダ選択がキャンセルされました", "WARNING")
             if self.worker_thread and self.worker_thread.workflow_processor:
@@ -356,10 +356,12 @@ class MainWindow(QMainWindow):
             if reply == QMessageBox.StandardButton.No:
                 # 一部ファイルのみ選択
                 dialog = SimpleFileSelectorDialog(file_list, self)
-                if dialog.exec() == QMessageBox.Accepted:
+                if dialog.exec() == QDialog.DialogCode.Accepted:
                     selected_files = dialog.get_selected_files()
+                    print(f"[DEBUG] MainWindow: ダイアログから取得したファイル数: {len(selected_files)}")
                     self.log_panel.append_log(f"ファイル選択: {len(selected_files)}個を選択", "INFO")
                     if callback:
+                        print(f"[DEBUG] MainWindow: callbackを呼び出します")
                         callback(selected_files)
                 else:
                     self.log_panel.append_log("ファイル選択がキャンセルされました", "INFO")
@@ -400,7 +402,7 @@ class MainWindow(QMainWindow):
     def show_process_mode_dialog(self):
         """処理方式選択ダイアログを表示"""
         dialog = ProcessModeDialog(self)
-        if dialog.exec() == dialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.process_mode = dialog.get_selected_mode()
             mode_text = "API方式" if self.process_mode == ProcessModeDialog.MODE_API else "従来方式"
             self.log_panel.append_log(f"処理方式を変更: {mode_text}", "INFO")

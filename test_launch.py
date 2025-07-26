@@ -7,7 +7,7 @@ print("依存関係をテストしています...")
 
 try:
     print("1. PyQt5...")
-    from PyQt6.QtWidgets import QApplication
+    from PyQt5.QtWidgets import QApplication
     print("   ✓ PyQt5: OK")
 except Exception as e:
     print(f"   ✗ PyQt5: {e}")
