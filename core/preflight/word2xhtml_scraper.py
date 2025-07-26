@@ -219,19 +219,17 @@ class Word2XhtmlScrapingVerifier(PreflightVerifier):
     def check_all_status(self, job_ids: List[str]) -> Dict[str, Tuple[str, Optional[str]]]:
         """全ジョブのステータスを確認
         
-        注意: 現在の実装ではメール監視が必要なため、
-        この機能は別途実装が必要
+        注意: この実装ではバッチプロセッサーがメール監視を直接行うため、
+        このメソッドは使用されません。将来のAPI移行時に使用予定。
         """
-        results = {}
+        self.logger.info("check_all_statusは現在未使用です。バッチプロセッサーがメール監視を行います。")
         
+        # 将来のAPI実装のためのプレースホルダー
+        results = {}
         for job_id in job_ids:
-            if not job_id:  # 空のIDはスキップ
-                continue
+            if job_id:
+                results[job_id] = ("pending", None)
                 
-            # TODO: Phase 4でメール監視機能との連携を実装
-            # 現時点では仮実装
-            results[job_id] = ("pending", None)
-            
         return results
     
     def cleanup(self):

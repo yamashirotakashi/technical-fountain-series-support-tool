@@ -5,9 +5,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+import os
 
 from .verifier_base import PreflightVerifier
 from .word2xhtml_scraper import Word2XhtmlScrapingVerifier
+from .email_result_monitor import PreflightEmailResultMonitor
 from .state_manager import PreflightStateManager
 from utils.logger import get_logger
 
@@ -121,7 +123,7 @@ class BatchProcessor:
                                     len(self.jobs))
                 
     def _check_results(self):
-        """結果を確認（Phase 4で実装）"""
+        """メール監視で結果を確認"""
         uploaded_jobs = [job for job in self.jobs.values() if job.status == "uploaded"]
         
         if not uploaded_jobs:
@@ -129,26 +131,67 @@ class BatchProcessor:
             
         self.logger.info(f"結果確認開始: {len(uploaded_jobs)}ファイル")
         
-        # TODO: Phase 4でメール監視と連携
-        # 現時点では仮実装
-        job_ids = [job.job_id for job in uploaded_jobs if job.job_id]
-        results = self.verifier.check_all_status(job_ids)
+        # メールアドレスとパスワードを取得
+        email_address = os.getenv('GMAIL_ADDRESS')
+        email_password = os.getenv('GMAIL_APP_PASSWORD')
         
-        for job in uploaded_jobs:
-            if self._cancelled:
-                break
-                
-            if job.job_id and job.job_id in results:
-                status, error_msg = results[job.job_id]
-                if status == "success":
-                    job.status = "success"
-                elif status == "error":
-                    job.status = "error"
-                    job.error_message = error_msg or "PDF変換エラー"
+        if not email_address or not email_password:
+            self.logger.error("メール認証情報が設定されていません")
+            # すべてのジョブをエラーに
+            for job in uploaded_jobs:
+                job.status = "error"
+                job.error_message = "メール設定エラー"
+                self._notify_job_updated(job)
+            return
+            
+        # メール監視を開始
+        try:
+            email_monitor = PreflightEmailResultMonitor(email_address, email_password)
+            
+            # ジョブIDのリストを作成
+            job_ids = [job.job_id for job in uploaded_jobs if job.job_id]
+            
+            # メール結果を待機（最大40分）
+            self.logger.info("メール結果を待機中...")
+            results = email_monitor.wait_for_results(job_ids, timeout=2400, check_interval=30)
+            
+            # 結果を反映
+            for job in uploaded_jobs:
+                if self._cancelled:
+                    break
+                    
+                if job.job_id and job.job_id in results:
+                    status, error_msg = results[job.job_id]
+                    
+                    if status == "success":
+                        job.status = "success"
+                        self.logger.info(f"検証成功: {Path(job.file_path).name}")
+                    elif status == "error":
+                        job.status = "error"
+                        job.error_message = error_msg or "PDF変換エラー"
+                        self.logger.warning(f"検証失敗: {Path(job.file_path).name} - {job.error_message}")
+                    elif status == "timeout":
+                        job.status = "error"
+                        job.error_message = "メール待機タイムアウト"
+                        self.logger.warning(f"タイムアウト: {Path(job.file_path).name}")
                 else:
-                    job.status = "checking"
+                    # ジョブIDがない、または結果が取得できなかった
+                    job.status = "error"
+                    job.error_message = "結果取得失敗"
                     
                 self._notify_job_updated(job)
+                
+            # メール接続を閉じる
+            email_monitor.close()
+            
+        except Exception as e:
+            self.logger.error(f"メール監視エラー: {e}")
+            # エラー時はすべてのジョブをエラーに
+            for job in uploaded_jobs:
+                if job.status == "uploaded":  # まだ処理されていない場合
+                    job.status = "error"
+                    job.error_message = f"メール監視エラー: {str(e)}"
+                    self._notify_job_updated(job)
                 
     def cancel(self):
         """処理をキャンセル"""

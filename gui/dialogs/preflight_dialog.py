@@ -79,10 +79,13 @@ class PreflightWorker(QThread):
             self.status_updated.emit(f"アップロード中: {filename}")
         elif job.status == "uploaded":
             self.status_updated.emit(f"アップロード完了: {filename}")
+        elif job.status == "checking":
+            self.status_updated.emit(f"結果待機中: {filename}")
         elif job.status == "error":
             self.file_checked.emit(filename, True, job.error_message or "エラー")
+            self.status_updated.emit(f"エラー: {filename} - {job.error_message}")
         elif job.status == "success":
-            self.status_updated.emit(f"検証成功: {filename}")
+            self.status_updated.emit(f"✓ 検証成功: {filename}")
             
     def _on_progress_updated(self, completed: int, total: int):
         """進捗更新時のコールバック"""
