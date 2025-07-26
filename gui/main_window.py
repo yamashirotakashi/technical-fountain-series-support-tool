@@ -205,22 +205,32 @@ class MainWindow(QMainWindow):
             )
             
             if reply == QMessageBox.StandardButton.Yes:
-                # 環境変数から取得を試みる
-                import os
-                email_password = os.getenv('GMAIL_APP_PASSWORD')
+                # Gmail API使用確認
+                from utils.config import get_config
+                config = get_config()
+                use_gmail_api = config.get('email', {}).get('use_gmail_api', False)
                 
-                # 環境変数にない場合のみ入力を求める
-                if not email_password:
-                    email_password, ok = QInputDialog.getText(
-                        self,
-                        "メールパスワード",
-                        "メールのアプリパスワードを入力してください:",
-                        QLineEdit.EchoMode.Password
-                    )
-                    if not ok or not email_password:
-                        email_password = None
+                if use_gmail_api:
+                    self.log_panel.append_log("Gmail APIを使用してメール監視を行います", "INFO")
+                    # Gmail APIの場合はパスワード不要
+                    email_password = "GMAIL_API"  # ダミー値（email_monitorプロパティで判定）
                 else:
-                    self.log_panel.append_log("環境変数からメールパスワードを取得しました", "INFO")
+                    # 環境変数から取得を試みる
+                    import os
+                    email_password = os.getenv('GMAIL_APP_PASSWORD')
+                    
+                    # 環境変数にない場合のみ入力を求める
+                    if not email_password:
+                        email_password, ok = QInputDialog.getText(
+                            self,
+                            "メールパスワード",
+                            "メールのアプリパスワードを入力してください:",
+                            QLineEdit.EchoMode.Password
+                        )
+                        if not ok or not email_password:
+                            email_password = None
+                    else:
+                        self.log_panel.append_log("環境変数からメールパスワードを取得しました", "INFO")
         
         # UIを無効化
         self.input_panel.set_enabled(False)
