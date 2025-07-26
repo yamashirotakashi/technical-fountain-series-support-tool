@@ -1,30 +1,30 @@
-"""Word2XHTML5サービスのSelenium実装"""
+"""Word2XHTML5サービスのrequests実装"""
 import time
 import re
+import requests
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 from .verifier_base import PreflightVerifier
-from .selenium_driver_manager import SeleniumDriverManager
 from .rate_limiter import RateLimiter
+from .form_settings import Word2XhtmlFormSettings
 from utils.logger import get_logger
 
 
 class Word2XhtmlScrapingVerifier(PreflightVerifier):
-    """Seleniumを使用したWord2XHTML5サービスの検証実装"""
+    """requestsを使用したWord2XHTML5サービスの検証実装"""
     
     SERVICE_URL = "http://trial.nextpublishing.jp/upload_46tate/"
     
     def __init__(self):
         self.logger = get_logger(__name__)
-        self.driver_manager = SeleniumDriverManager()
         self.rate_limiter = RateLimiter(min_interval=5.0)
-        self.driver = None
+        self.session = requests.Session()
         self.job_file_mapping: Dict[str, str] = {}  # job_id -> file_path
+        
+        # Basic認証設定（Re:VIEW変換と同じ認証情報）
+        from requests.auth import HTTPBasicAuth
+        self.session.auth = HTTPBasicAuth("ep_user", "Nn7eUTX5")
         
     def _extract_job_id(self, page_text: str) -> Optional[str]:
         """ページテキストからジョブIDを抽出
@@ -57,7 +57,7 @@ class Word2XhtmlScrapingVerifier(PreflightVerifier):
         return None
         
     def _submit_single(self, file_path: str, email: str) -> Optional[str]:
-        """単一ファイルを送信してジョブIDを取得
+        """横書き専用の単一ファイル送信（requests版）
         
         Args:
             file_path: Wordファイルのパス
@@ -67,131 +67,52 @@ class Word2XhtmlScrapingVerifier(PreflightVerifier):
             ジョブID（失敗時はNone）
         """
         try:
-            # ドライバーを取得
-            if not self.driver:
-                self.driver = self.driver_manager.get_driver()
+            # フォーム設定を作成
+            settings = Word2XhtmlFormSettings.create_default(email)
+            if not settings.validate():
+                raise Exception(f"フォーム設定が無効です: {settings}")
+            
+            self.logger.info(f"ファイル送信開始: {file_path}")
+            self.logger.info(f"送信先: {self.SERVICE_URL}")
+            
+            # フォームデータの準備
+            form_data = settings.get_form_data()
+            
+            # ファイルの準備
+            file_path_obj = Path(file_path)
+            if not file_path_obj.exists():
+                raise Exception(f"ファイルが存在しません: {file_path}")
+            
+            with open(file_path, 'rb') as f:
+                files = {
+                    'userfile1': (file_path_obj.name, f, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+                }
                 
-            # サービスページにアクセス
-            self.logger.info(f"アクセス中: {self.SERVICE_URL}")
-            self.driver.get(self.SERVICE_URL)
-            wait = WebDriverWait(self.driver, 20)
+                # POST送信
+                response = self.session.post(
+                    self.SERVICE_URL,
+                    data=form_data,
+                    files=files,
+                    timeout=300
+                )
             
-            # ページロード完了を待機
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "form")))
-            
-            # フォームの要素を探す（複数の可能性を考慮）
-            file_input = None
-            for selector in [
-                (By.NAME, "upload_file"),
-                (By.NAME, "file"),
-                (By.NAME, "docx_file"),
-                (By.XPATH, "//input[@type='file']"),
-                (By.CSS_SELECTOR, "input[type='file']")
-            ]:
-                try:
-                    file_input = self.driver.find_element(*selector)
-                    break
-                except NoSuchElementException:
-                    continue
-                    
-            if not file_input:
-                raise Exception("ファイル入力フィールドが見つかりません")
+            # レスポンス確認
+            if response.status_code == 200:
+                job_id = self._extract_job_id(response.text)
+                if not job_id:
+                    # フォールバック: タイムスタンプベースID
+                    job_id = f"word2xhtml_{int(time.time())}_{file_path_obj.stem}"
+                    self.logger.warning(f"ジョブID抽出失敗、生成ID使用: {job_id}")
                 
-            # ファイルを選択
-            self.logger.info(f"ファイル選択: {file_path}")
-            file_input.send_keys(str(Path(file_path).absolute()))
-            
-            # メールアドレス入力フィールドを探す
-            email_input = None
-            for selector in [
-                (By.NAME, "email"),
-                (By.NAME, "mail"),
-                (By.NAME, "email_address"),
-                (By.XPATH, "//input[@type='email']"),
-                (By.XPATH, "//input[contains(@placeholder, 'メール')]"),
-                (By.XPATH, "//input[contains(@placeholder, 'mail')]")
-            ]:
-                try:
-                    email_input = self.driver.find_element(*selector)
-                    break
-                except NoSuchElementException:
-                    continue
-                    
-            if not email_input:
-                raise Exception("メールアドレス入力フィールドが見つかりません")
+                self.logger.info(f"ファイル送信成功: {file_path} -> {job_id}")
+                return job_id
+            else:
+                self.logger.error(f"送信失敗: HTTP {response.status_code}")
+                self.logger.error(f"レスポンス: {response.text[:500]}")
+                return None
                 
-            # メールアドレスを入力
-            self.logger.info(f"メールアドレス入力: {email}")
-            email_input.clear()
-            email_input.send_keys(email)
-            
-            # 送信ボタンを探す
-            submit_button = None
-            for selector in [
-                (By.XPATH, "//input[@type='submit']"),
-                (By.XPATH, "//button[@type='submit']"),
-                (By.XPATH, "//input[@value='送信']"),
-                (By.XPATH, "//button[contains(text(), '送信')]"),
-                (By.XPATH, "//input[contains(@value, 'アップロード')]"),
-                (By.XPATH, "//button[contains(text(), 'アップロード')]")
-            ]:
-                try:
-                    submit_button = self.driver.find_element(*selector)
-                    break
-                except NoSuchElementException:
-                    continue
-                    
-            if not submit_button:
-                raise Exception("送信ボタンが見つかりません")
-                
-            # 送信前のページURLを記録
-            current_url = self.driver.current_url
-            
-            # 送信ボタンをクリック
-            self.logger.info("送信ボタンをクリック")
-            submit_button.click()
-            
-            # ページ遷移またはアラートを待機
-            time.sleep(3)
-            
-            # アラートの処理
-            try:
-                alert = self.driver.switch_to.alert
-                alert_text = alert.text
-                self.logger.info(f"アラート: {alert_text}")
-                alert.accept()
-            except:
-                pass
-                
-            # 結果ページの内容を取得
-            page_text = self.driver.find_element(By.TAG_NAME, "body").text
-            self.logger.debug(f"ページテキスト（最初の500文字）: {page_text[:500]}")
-            
-            # ジョブIDを抽出
-            job_id = self._extract_job_id(page_text)
-            
-            # ジョブIDが見つからない場合、タイムスタンプベースのIDを生成
-            if not job_id:
-                job_id = f"job_{int(time.time() * 1000)}_{Path(file_path).stem}"
-                self.logger.warning(f"ジョブIDが見つからないため生成: {job_id}")
-            
-            self.logger.info(f"ファイル送信成功: {file_path} -> {job_id}")
-            return job_id
-            
-        except TimeoutException:
-            self.logger.error(f"タイムアウト: {file_path}")
-            return None
         except Exception as e:
             self.logger.error(f"送信エラー: {file_path} - {e}", exc_info=True)
-            # スクリーンショットを保存（デバッグ用）
-            if self.driver:
-                try:
-                    screenshot_path = Path.home() / ".techzip" / "debug" / f"error_{int(time.time())}.png"
-                    screenshot_path.parent.mkdir(parents=True, exist_ok=True)
-                    self.driver.save_screenshot(str(screenshot_path))
-                    self.logger.info(f"エラー時のスクリーンショット: {screenshot_path}")
-                except:
-                    pass
             return None
     
     def submit_batch(self, file_paths: List[str], email: str) -> List[str]:
@@ -234,5 +155,6 @@ class Word2XhtmlScrapingVerifier(PreflightVerifier):
     
     def cleanup(self):
         """リソースのクリーンアップ"""
-        self.driver_manager.cleanup()
+        if hasattr(self, 'session'):
+            self.session.close()
         self.job_file_mapping.clear()
