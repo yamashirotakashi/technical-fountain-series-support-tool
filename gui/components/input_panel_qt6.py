@@ -123,9 +123,10 @@ class InputPanel(QWidget):
             }
         """)
         
-        # Settings button
-        self.settings_button = QPushButton("設定")
+        # Settings button (処理方式選択)
+        self.settings_button = QPushButton("処理方式")
         self.settings_button.clicked.connect(self.on_settings_clicked)
+        self.settings_button.setToolTip("API方式、メール方式、Gmail API方式から選択")
         self.settings_button.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3;

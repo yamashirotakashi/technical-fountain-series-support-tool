@@ -78,6 +78,8 @@ class MainWindow(QMainWindow):
         self.error_detector_worker = None
         self.preflight_dialog = None
         self.process_mode = ProcessModeDialog.MODE_API  # デフォルトはAPI方式
+        # Gmail API方式をデフォルトにする場合は以下をコメントアウト解除
+        # self.process_mode = ProcessModeDialog.MODE_GMAIL_API
         self.setup_ui()
         self.setup_menu()
         self.setup_statusbar()
@@ -441,9 +443,14 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def show_process_mode_dialog(self):
         """処理方式選択ダイアログを表示"""
+        print("[DEBUG] show_process_mode_dialog called")
         dialog = ProcessModeDialog(self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
+        result = dialog.exec()
+        print(f"[DEBUG] dialog.exec() result: {result}")
+        
+        if result == QDialog.DialogCode.Accepted:
             self.process_mode = dialog.get_selected_mode()
+            print(f"[DEBUG] MainWindow - 取得したモード: {self.process_mode}")
             
             # モードテキストマッピング
             mode_text_map = {
@@ -458,6 +465,8 @@ class MainWindow(QMainWindow):
             
             # デバッグログ
             self.log_panel.append_log(f"[DEBUG] process_mode = {repr(self.process_mode)}", "DEBUG")
+        else:
+            print("[DEBUG] ダイアログがキャンセルされました")
     
     # Pre-flight Check関数を削除
         

@@ -159,5 +159,6 @@ class ProcessModeDialog(QDialog):
     def accept(self):
         """OKボタンが押された時の処理"""
         self.selected_mode = self.get_selected_mode()
+        print(f"[DEBUG] ProcessModeDialog - 選択されたモード: {self.selected_mode}")
         self.mode_selected.emit(self.selected_mode)
         super().accept()
