@@ -13,6 +13,7 @@ class InputPanel(QWidget):
     # Custom signals
     processing_requested = pyqtSignal(list, int)  # Send N-code list and process mode
     settings_requested = pyqtSignal()  # Settings button clicked
+    preflight_requested = pyqtSignal()  # Pre-flight Check button clicked
     
     def __init__(self, parent=None):
         """
@@ -142,10 +143,32 @@ class InputPanel(QWidget):
             }
         """)
         
+        # Pre-flight Check button
+        self.preflight_button = QPushButton("Pre-flight Check")
+        self.preflight_button.clicked.connect(self.on_preflight_clicked)
+        self.preflight_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                font-weight: bold;
+                padding: 8px 20px;
+                border: none;
+                border-radius: 4px;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+            QPushButton:pressed {
+                background-color: #EF6C00;
+            }
+        """)
+        
         # Add buttons
         button_layout.addWidget(self.process_button)
         button_layout.addWidget(self.clear_button)
         button_layout.addWidget(self.settings_button)
+        button_layout.addWidget(self.preflight_button)
         button_layout.addStretch()
         
         # Add to group layout
@@ -212,6 +235,10 @@ class InputPanel(QWidget):
         """Handler for settings button click"""
         self.settings_requested.emit()
     
+    def on_preflight_clicked(self):
+        """Handler for Pre-flight Check button click"""
+        self.preflight_requested.emit()
+    
     def show_error(self, message: str):
         """Show error message"""
         from PyQt6.QtWidgets import QMessageBox
@@ -221,4 +248,6 @@ class InputPanel(QWidget):
         """Set panel enabled/disabled"""
         self.process_button.setEnabled(enabled)
         self.clear_button.setEnabled(enabled)
+        self.settings_button.setEnabled(enabled)
+        self.preflight_button.setEnabled(enabled)
         self.n_code_input.setEnabled(enabled)

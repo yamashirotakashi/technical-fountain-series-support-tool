@@ -177,6 +177,7 @@ class MainWindow(QMainWindow):
         # 入力パネルからのシグナル
         self.input_panel.processing_requested.connect(self.start_processing)
         self.input_panel.settings_requested.connect(self.show_process_mode_dialog)
+        self.input_panel.preflight_requested.connect(self.show_preflight_check)
     
     @pyqtSlot(list)
     def start_processing(self, n_codes):
