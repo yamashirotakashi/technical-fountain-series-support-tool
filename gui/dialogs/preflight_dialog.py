@@ -48,6 +48,8 @@ class PreflightWorker(QThread):
             # 結果をチェック（すでにリアルタイムで表示済み）
             if not self._cancelled:
                 self.status_updated.emit("検証処理が完了しました")
+                # 完了時は状態をクリア
+                self.batch_processor.state_manager.clear_state()
                 
         except Exception as e:
             self.logger.error(f"Pre-flight Checkエラー: {e}", exc_info=True)
@@ -96,6 +98,7 @@ class PreflightDialog(QDialog):
         self.setMinimumSize(700, 500)
         self.worker: Optional[PreflightWorker] = None
         self.setup_ui()
+        self.check_saved_state()
         
     def setup_ui(self):
         """UIを設定"""
@@ -156,6 +159,18 @@ class PreflightDialog(QDialog):
         self.start_button.setEnabled(False)
         button_layout.addWidget(self.start_button)
         
+        # 中断ボタン
+        self.pause_button = QPushButton("中断")
+        self.pause_button.clicked.connect(self.pause_check)
+        self.pause_button.setEnabled(False)
+        button_layout.addWidget(self.pause_button)
+        
+        # 再開ボタン
+        self.resume_button = QPushButton("再開")
+        self.resume_button.clicked.connect(self.resume_check)
+        self.resume_button.setEnabled(False)
+        button_layout.addWidget(self.resume_button)
+        
         # リストクリアボタン
         self.clear_button = QPushButton("リストクリア")
         self.clear_button.clicked.connect(self.clear_list)
@@ -173,6 +188,32 @@ class PreflightDialog(QDialog):
         # 選択されたフォルダ
         self.selected_folder: Optional[Path] = None
         self.word_files: List[Path] = []
+        
+    def check_saved_state(self):
+        """保存された状態をチェック"""
+        from core.preflight.state_manager import PreflightStateManager
+        state_manager = PreflightStateManager()
+        state = state_manager.load_state()
+        
+        if state and state.get('jobs'):
+            # 未完了のジョブがある場合
+            incomplete_jobs = [job for job in state['jobs'].values() 
+                             if job.get('status') not in ['success', 'error']]
+            
+            if incomplete_jobs:
+                reply = QMessageBox.question(
+                    self,
+                    "前回の処理を再開",
+                    f"前回中断された処理が見つかりました。\n"
+                    f"未完了のファイル: {len(incomplete_jobs)}件\n\n"
+                    f"再開しますか？",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.resume_button.setEnabled(True)
+                    self.status_label.setText("前回の処理を再開できます")
+                    self.status_label.setStyleSheet("color: blue;")
         
     @pyqtSlot()
     def select_folder(self):
@@ -221,6 +262,7 @@ class PreflightDialog(QDialog):
         # UIを更新
         self.select_folder_button.setEnabled(False)
         self.start_button.setEnabled(False)
+        self.pause_button.setEnabled(True)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         
@@ -260,9 +302,62 @@ class PreflightDialog(QDialog):
         self.status_label.setText(status)
         
     @pyqtSlot()
+    def pause_check(self):
+        """検証を中断"""
+        if self.worker and self.worker.isRunning():
+            self.worker.cancel()
+            self.pause_button.setEnabled(False)
+            self.resume_button.setEnabled(True)
+            self.status_label.setText("検証を中断しました")
+            self.status_label.setStyleSheet("color: orange;")
+            
+    @pyqtSlot()
+    def resume_check(self):
+        """検証を再開"""
+        # メールアドレスを取得
+        import os
+        email = os.getenv("GMAIL_ADDRESS")
+        if not email:
+            QMessageBox.critical(
+                self,
+                "設定エラー",
+                "環境変数GMAIL_ADDRESSが設定されていません。"
+            )
+            return
+            
+        # 状態を復元して処理を再開
+        from core.preflight.batch_processor import BatchProcessor
+        batch_processor = BatchProcessor()
+        
+        if batch_processor.resume_from_state():
+            self.status_label.setText("保存された状態から再開中...")
+            self.resume_button.setEnabled(False)
+            self.pause_button.setEnabled(True)
+            self.progress_bar.setVisible(True)
+            
+            # 復元されたファイルリストを作成
+            self.word_files = [Path(job.file_path) for job in batch_processor.jobs.values()]
+            
+            # ワーカースレッドを開始（復元されたバッチプロセッサーを使用）
+            self.worker = PreflightWorker(self.word_files, email)
+            self.worker.batch_processor = batch_processor
+            self.worker.file_checked.connect(self.on_file_checked)
+            self.worker.progress_updated.connect(self.progress_bar.setValue)
+            self.worker.status_updated.connect(self.update_status)
+            self.worker.finished.connect(self.on_check_finished)
+            self.worker.start()
+        else:
+            QMessageBox.warning(
+                self,
+                "再開失敗",
+                "保存された状態が見つかりません。"
+            )
+            
+    @pyqtSlot()
     def on_check_finished(self):
         """チェック完了時の処理"""
         self.select_folder_button.setEnabled(True)
+        self.pause_button.setEnabled(False)
         self.progress_bar.setVisible(False)
         self.set_check_complete()
         
