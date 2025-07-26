@@ -14,6 +14,7 @@ class InputPanel(QWidget):
     processing_requested = pyqtSignal(list, int)  # Send N-code list and process mode
     settings_requested = pyqtSignal()  # Settings button clicked
     preflight_requested = pyqtSignal()  # Pre-flight Check button clicked
+    error_check_requested = pyqtSignal(list)  # Error file detection requested
     
     def __init__(self, parent=None):
         """
@@ -164,10 +165,37 @@ class InputPanel(QWidget):
             }
         """)
         
+        # Error file detection button
+        self.error_check_button = QPushButton("エラーファイル検知")
+        self.error_check_button.clicked.connect(self.on_error_check_clicked)
+        self.error_check_button.setToolTip("組版エラー後の原因ファイルを特定します")
+        self.error_check_button.setStyleSheet("""
+            QPushButton {
+                background-color: #E91E63;
+                color: white;
+                font-weight: bold;
+                padding: 8px 20px;
+                border: none;
+                border-radius: 4px;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #C2185B;
+            }
+            QPushButton:pressed {
+                background-color: #AD1457;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+        
         # Add buttons
         button_layout.addWidget(self.process_button)
         button_layout.addWidget(self.clear_button)
         button_layout.addWidget(self.settings_button)
+        button_layout.addWidget(self.error_check_button)
         button_layout.addWidget(self.preflight_button)
         button_layout.addStretch()
         
@@ -239,6 +267,12 @@ class InputPanel(QWidget):
         """Handler for Pre-flight Check button click"""
         self.preflight_requested.emit()
     
+    def on_error_check_clicked(self):
+        """Handler for error file detection button click"""
+        if self.validate_input():
+            n_codes = self.get_n_codes()
+            self.error_check_requested.emit(n_codes)
+    
     def show_error(self, message: str):
         """Show error message"""
         from PyQt6.QtWidgets import QMessageBox
@@ -250,4 +284,5 @@ class InputPanel(QWidget):
         self.clear_button.setEnabled(enabled)
         self.settings_button.setEnabled(enabled)
         self.preflight_button.setEnabled(enabled)
+        self.error_check_button.setEnabled(enabled)
         self.n_code_input.setEnabled(enabled)

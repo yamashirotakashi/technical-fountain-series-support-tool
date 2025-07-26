@@ -1,6 +1,7 @@
 ﻿"""メール監視モジュール"""
 import imaplib
 import email
+from email.message import Message
 import re
 import time
 from typing import Optional
@@ -32,6 +33,7 @@ class EmailMonitor:
         self.imap_port = email_config.get('imap_port', 993)
         
         self.connection = None
+        self.processed_email_ids = set()  # 処理済みメールIDを記録
     
     def connect(self):
         """IMAPサーバーに接続"""
@@ -57,7 +59,8 @@ class EmailMonitor:
             raise
     
     def wait_for_email(self, subject_pattern: str = "Re:VIEW to 超原稿用紙", 
-                      timeout: int = 600, check_interval: int = 10) -> Optional[str]:
+                      timeout: int = 600, check_interval: int = 10,
+                      return_with_filename: bool = False) -> Optional[str]:
         """
         特定の件名のメールを待機してダウンロードURLを取得
         
@@ -65,9 +68,10 @@ class EmailMonitor:
             subject_pattern: 待機する件名のパターン
             timeout: タイムアウト時間（秒）
             check_interval: チェック間隔（秒）
+            return_with_filename: ファイル名とURLのタプルで返すかどうか
         
         Returns:
-            ダウンロードURL（見つからない場合はNone）
+            ダウンロードURL、またはreturn_with_filenameがTrueの場合は(URL, ファイル名)のタプル
         """
         if not self.connection:
             self.connect()
@@ -106,6 +110,10 @@ class EmailMonitor:
                     if email_ids:
                         # 新しいメールから順に確認（逆順）
                         for email_id in reversed(email_ids):
+                            # 処理済みメールはスキップ
+                            if email_id in self.processed_email_ids:
+                                continue
+                                
                             self.logger.info(f"メールID {email_id} を確認中...")
                             
                             # メールを取得
@@ -128,11 +136,22 @@ class EmailMonitor:
                                         if subject_pattern in decoded_subject:
                                             self.logger.info(f"該当するメールを発見: ID {email_id}, 件名: {decoded_subject}")
                                             
-                                            # URLを抽出
-                                            download_url = self._extract_download_url(msg)
-                                            if download_url:
-                                                self.logger.info(f"ダウンロードURLを取得: {download_url}")
-                                                return download_url
+                                            # URLを抽出（ファイル名付きで返すオプション）
+                                            if return_with_filename:
+                                                result = self._extract_download_url_with_filename(msg)
+                                                if result:
+                                                    url, filename = result
+                                                    self.logger.info(f"ダウンロードURLを取得: {url} (ファイル: {filename})")
+                                                    # 処理済みとしてマーク
+                                                    self.processed_email_ids.add(email_id)
+                                                    return result
+                                            else:
+                                                download_url = self._extract_download_url(msg)
+                                                if download_url:
+                                                    self.logger.info(f"ダウンロードURLを取得: {download_url}")
+                                                    # 処理済みとしてマーク
+                                                    self.processed_email_ids.add(email_id)
+                                                    return download_url
                                     except Exception as decode_error:
                                         self.logger.warning(f"件名デコードエラー (ID {email_id}): {decode_error}")
                                         # デコードエラーの場合はスキップして次へ
@@ -154,7 +173,80 @@ class EmailMonitor:
         self.logger.warning(f"タイムアウト: {timeout}秒以内にメールが見つかりませんでした")
         return None
     
-    def _extract_download_url(self, msg: email.message.Message) -> Optional[str]:
+    def _extract_download_url_with_filename(self, msg: Message) -> Optional[tuple]:
+        """
+        メールからダウンロードURLとファイル名を抽出
+        
+        Args:
+            msg: メールメッセージ
+        
+        Returns:
+            (ダウンロードURL, ファイル名)のタプル（見つからない場合はNone）
+        """
+        try:
+            # メール本文を取得
+            body = self._get_email_body(msg)
+            if not body:
+                return None
+            
+            # Word2XHTML5のメール形式：ファイル名を探す
+            # 複数のパターンを試す
+            patterns = [
+                r'(?:ファイル名|File|file)[\s:：]+([^\s]+\.docx)',  # "ファイル名: xxx.docx"
+                r'([^\s/]+\.docx)(?=\s*の変換)',  # "xxx.docx の変換"
+                r'「([^」]+\.docx)」',  # 「xxx.docx」
+                r'"([^"]+\.docx)"',  # "xxx.docx"
+                r'([^\s/<>]+\.docx)',  # 単純にdocxファイル名を探す
+            ]
+            
+            filename = None
+            for pattern in patterns:
+                filename_match = re.search(pattern, body)
+                if filename_match:
+                    filename = filename_match.group(1)
+                    self.logger.info(f"メール本文からファイル名を検出: {filename}")
+                    break
+            
+            # URLを抽出
+            url = self._extract_download_url(msg)
+            if url and filename:
+                return (url, filename)
+            elif url:
+                # ファイル名が見つからない場合でもURLだけ返す
+                self.logger.warning("ファイル名が見つかりませんでした")
+                return (url, None)
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"URL/ファイル名抽出中にエラー: {e}")
+            return None
+    
+    def _get_email_body(self, msg: Message) -> Optional[str]:
+        """メール本文を取得"""
+        try:
+            body = ""
+            
+            if msg.is_multipart():
+                for part in msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        payload = part.get_payload(decode=True)
+                        if payload:
+                            body = self._safe_decode_payload(payload)
+                            if body:
+                                break
+            else:
+                payload = msg.get_payload(decode=True)
+                if payload:
+                    body = self._safe_decode_payload(payload)
+            
+            return body
+            
+        except Exception as e:
+            self.logger.error(f"メール本文取得エラー: {e}")
+            return None
+    
+    def _extract_download_url(self, msg: Message) -> Optional[str]:
         """
         メールからダウンロードURLを抽出
         
@@ -166,21 +258,7 @@ class EmailMonitor:
         """
         try:
             # メール本文を取得
-            body = ""
-            
-            if msg.is_multipart():
-                for part in msg.walk():
-                    if part.get_content_type() == "text/plain":
-                        payload = part.get_payload(decode=True)
-                        if payload:
-                            # 複数のエンコーディングを試行
-                            body = self._safe_decode_payload(payload)
-                            if body:
-                                break
-            else:
-                payload = msg.get_payload(decode=True)
-                if payload:
-                    body = self._safe_decode_payload(payload)
+            body = self._get_email_body(msg)
             
             if not body:
                 self.logger.warning("メール本文を取得できませんでした")
@@ -235,6 +313,11 @@ class EmailMonitor:
         except Exception:
             self.logger.warning("ペイロードのデコードに失敗しました")
             return ""
+    
+    def reset_processed_emails(self):
+        """処理済みメールIDをリセット"""
+        self.processed_email_ids.clear()
+        self.logger.info("処理済みメールIDをリセットしました")
     
     def close(self):
         """接続を閉じる"""

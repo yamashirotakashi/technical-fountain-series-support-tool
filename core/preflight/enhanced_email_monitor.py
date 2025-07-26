@@ -347,6 +347,17 @@ class EnhancedEmailMonitor(PreflightEmailResultMonitor):
         self.logger.info(f"強化版検索完了: {len(found_job_ids)}/{len(job_ids)}件発見")
         return results
     
+    def disconnect(self) -> None:
+        """IMAP接続を切断"""
+        try:
+            self.close()  # 親クラスのcloseメソッドを呼び出し
+        except Exception as e:
+            self.logger.warning(f"メール接続切断時の警告: {e}")
+    
+    def cleanup(self) -> None:
+        """リソースのクリーンアップ（別名メソッド）"""
+        self.disconnect()
+    
     def get_search_statistics(self, results: Dict[str, EmailSearchResult]) -> Dict[str, any]:
         """検索結果の統計情報を取得
         

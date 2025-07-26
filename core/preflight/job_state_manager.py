@@ -194,7 +194,8 @@ class JobStateManager:
         phase: Optional[str] = None,
         error_message: Optional[str] = None,
         server_job_id: Optional[str] = None,
-        download_links: Optional[List[str]] = None
+        download_links: Optional[List[str]] = None,
+        validation_result: Optional[Dict[str, Any]] = None
     ) -> bool:
         """ジョブ状態を更新
         
@@ -206,6 +207,7 @@ class JobStateManager:
             error_message: エラーメッセージ
             server_job_id: サーバー側のジョブID
             download_links: ダウンロードリンク
+            validation_result: 検証結果の詳細
             
         Returns:
             更新成功の場合True
@@ -236,6 +238,9 @@ class JobStateManager:
             
             if download_links is not None:
                 job_state.download_links = download_links
+            
+            if validation_result is not None:
+                job_state.validation_result = validation_result
             
             # 完了時の処理
             if status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.TIMEOUT, JobStatus.CANCELLED]:

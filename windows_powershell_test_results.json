@@ -1,0 +1,110 @@
+{
+  "test_summary": {
+    "total_tests": 5,
+    "passed": 5,
+    "failed": 0,
+    "success_rate": 100.0
+  },
+  "test_results": {
+    "environment_setup": {
+      "status": "success",
+      "python_version": "3.12.3 (main, Jun 18 2025, 17:59:45) [GCC 13.3.0]",
+      "os_info": "posix/linux",
+      "missing_packages": [],
+      "env_configured": true
+    },
+    "manager_initialization": {
+      "status": "success",
+      "system_status": {
+        "system_info": {
+          "session_start_time": "2025-07-26T18:04:43.622276",
+          "session_duration_seconds": 0.001739,
+          "total_files_processed": 0,
+          "total_jobs_completed": 0,
+          "total_errors": 0
+        },
+        "job_statistics": {
+          "total_jobs": 12,
+          "status_counts": {
+            "submitted": 3,
+            "failed": 6,
+            "completed": 3
+          },
+          "priority_counts": {
+            "3": 8,
+            "2": 4
+          },
+          "total_files_size_mb": 0.01,
+          "active_jobs": 3,
+          "completed_jobs": 3,
+          "failed_jobs": 6,
+          "success_rate": 25.0,
+          "average_processing_time_seconds": 0.0
+        },
+        "performance_statistics": {},
+        "configuration": {
+          "verification_mode": "standard",
+          "email_configured": true,
+          "monitoring_interval": 30
+        },
+        "active_alerts": []
+      }
+    },
+    "file_validation": {
+      "status": "success",
+      "total_files": 4,
+      "job_results": 4,
+      "valid_jobs": 3,
+      "failed_jobs": 1,
+      "statistics": {
+        "total_jobs": 16,
+        "status_counts": {
+          "submitted": 3,
+          "failed": 7,
+          "completed": 6
+        },
+        "priority_counts": {
+          "3": 12,
+          "2": 4
+        },
+        "total_files_size_mb": 0.01,
+        "active_jobs": 3,
+        "completed_jobs": 6,
+        "failed_jobs": 7,
+        "success_rate": 37.5,
+        "average_processing_time_seconds": 0.0
+      }
+    },
+    "performance_monitoring": {
+      "status": "success",
+      "monitoring_active": true,
+      "performance_stats": {
+        "monitoring_active": true,
+        "collection_interval": 30,
+        "data_points": 2,
+        "average_cpu_percent": 2.0,
+        "average_memory_percent": 6.4,
+        "average_process_cpu_percent": 0.1,
+        "average_process_memory_mb": 31.8,
+        "peak_cpu_percent": 2.8,
+        "peak_memory_percent": 6.4,
+        "active_alerts_count": 0,
+        "total_alerts_count": 0,
+        "operation_statistics": {},
+        "custom_metrics": {
+          "active_jobs": 3
+        }
+      },
+      "load_test_time": 0.0004532337188720703,
+      "active_alerts": 0
+    },
+    "error_recovery": {
+      "status": "success",
+      "error_jobs_handled": 2,
+      "system_stable": true,
+      "total_errors": 2
+    }
+  },
+  "test_timestamp": "2025-07-26T18:05:03.667043",
+  "test_files_created": 3
+}
