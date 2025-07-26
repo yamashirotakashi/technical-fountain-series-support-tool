@@ -71,9 +71,10 @@ class Word2XhtmlApiVerifier(PreflightVerifier):
 - ダウンロード試行による検証
 
 ### Phase 5: 結果表示（1日）
-- エラーファイル一覧表示
-- 成功/失敗の統計情報
-- CSVエクスポート機能
+- リアルタイムエラー表示ダイアログ
+- エラー判明時に逐次追加表示
+- リストクリアボタンで明示的なリセット
+- ファイル名のみのシンプルな表示
 
 ### Phase 6: 状態管理（1日）
 - 処理中断・再開機能
@@ -157,7 +158,7 @@ technical-fountain-series-support-tool/
 │   └── email_monitor.py          # 既存（拡張）
 ├── gui/
 │   ├── dialogs/
-│   │   └── preflight_dialog.py   # 結果表示ダイアログ
+│   │   └── preflight_dialog.py   # リアルタイムエラー表示ダイアログ
 │   └── main_window_qt6.py        # 既存（ボタン追加）
 └── docs/
     ├── PREFLIGHT_CHECK_IMPLEMENTATION.md  # 本文書
@@ -179,7 +180,7 @@ technical-fountain-series-support-tool/
 ### 受け入れテスト
 - 100ファイルの連続処理
 - 中断・再開シナリオ
-- エラーレポートの有用性
+- リアルタイムエラー表示の応答性
 
 ## リスク管理
 
@@ -210,7 +211,7 @@ technical-fountain-series-support-tool/
    - アップロード: 1ファイルあたり平均10秒以内
    - 全体処理: 100ファイルで約7時間（メール待機含む）
 3. **安定性**: 100ファイル連続処理での成功率90%以上
-4. **ユーザビリティ**: 直感的なUI、明確なエラーレポート
+4. **ユーザビリティ**: 直感的なUI、リアルタイムエラー表示
 
 ## 付録: 倫理的配慮
 
