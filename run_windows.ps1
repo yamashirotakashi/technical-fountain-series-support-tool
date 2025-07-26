@@ -10,8 +10,20 @@ if (Test-Path ".\venv_windows") {
     # 仮想環境を有効化
     & ".\venv_windows\Scripts\Activate.ps1"
     
-    # アプリケーションを起動
-    python main.py
+    # Pythonの実行パスを確認
+    $pythonPath = ".\venv_windows\Scripts\python.exe"
+    if (Test-Path $pythonPath) {
+        Write-Host "仮想環境のPythonを使用: $pythonPath" -ForegroundColor Cyan
+        # 仮想環境のPythonを明示的に使用
+        & $pythonPath main.py
+    } else {
+        Write-Host "警告: 仮想環境のPythonが見つかりません。システムのPythonを使用します。" -ForegroundColor Yellow
+        # フォールバック: システムのPythonを使用
+        python.exe main.py
+    }
+    
+    # 仮想環境から抜ける
+    deactivate
 } else {
     Write-Host "エラー: 仮想環境が見つかりません" -ForegroundColor Red
     Write-Host "setup_windows.ps1を先に実行してください" -ForegroundColor Yellow
