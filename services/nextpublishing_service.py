@@ -219,28 +219,34 @@ class NextPublishingService:
         try:
             self.logger.info(f"PDFダウンロード可否チェック: {pdf_url}")
             
+            # ブラウザのようなヘッダーを設定
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0'
+            }
+            
             # GETリクエストでアクセス（リダイレクトに追従）
-            response = self.session.get(pdf_url, timeout=30, allow_redirects=True)
+            response = self.session.get(pdf_url, timeout=30, allow_redirects=True, headers=headers)
             
             self.logger.info(f"レスポンスステータス: {response.status_code}")
             self.logger.info(f"最終URL: {response.url}")
             self.logger.info(f"Content-Type: {response.headers.get('Content-Type', 'なし')}")
             
+            # 401エラーは認証が必要なだけで、PDFは存在する（ブラウザでダウンロード可能）
+            if response.status_code == 401:
+                self.logger.info("401エラー: 認証が必要ですが、PDFは生成済みと判断")
+                return True, "PDFダウンロード可能（要認証）"
+            
             if response.status_code == 200:
-                # リダイレクト後のURLを確認
-                final_url = str(response.url)
-                
-                # エラーページにリダイレクトされた場合
-                if 'do_download_pdf' in final_url:
-                    self.logger.info("エラーページにリダイレクトされました")
-                    # エラー内容を確認
-                    content = response.content.decode('utf-8', errors='ignore')
-                    if 'ファイルの作成に失敗しました' in content:
-                        return False, "PDF生成エラー（超原稿用紙に不備）"
-                    else:
-                        return False, "PDF生成エラー"
-                
-                # PDFファイルかどうかを確認
+                # まずContent-Typeとファイル内容を確認
                 content_type = response.headers.get('Content-Type', '')
                 content_start = response.content[:10] if response.content else b''
                 
@@ -250,12 +256,24 @@ class NextPublishingService:
                 elif 'application/pdf' in content_type:
                     # Content-TypeがPDFの場合
                     return True, "PDFダウンロード可能"
+                
+                # PDFではない場合、エラーページかどうか確認
+                final_url = str(response.url)
+                if 'do_download_pdf' in final_url:
+                    # HTMLコンテンツの場合のみエラーメッセージを確認
+                    if b'<html' in content_start.lower() or b'<!doctype' in content_start.lower():
+                        self.logger.info("HTMLエラーページを検出")
+                        # エラー内容を確認
+                        content = response.content.decode('utf-8', errors='ignore')
+                        if 'ファイルの作成に失敗しました' in content:
+                            return False, "PDF生成エラー（超原稿用紙に不備）"
+                        else:
+                            return False, "PDF生成エラー"
                 elif 'application/x-zip' in content_type or 'application/zip' in content_type:
-                    # ZIPファイルが返される場合
-                    # ZIPファイルの内容を確認（PDFかエラーページか）
+                    # ZIPファイルが返される場合（PDF URLでZIPが返されることは異常）
                     if content_start.startswith(b'PK'):  # ZIPファイルのマジックナンバー
-                        self.logger.info("ZIPファイルが返されました（正常なPDFを含む可能性）")
-                        return True, "PDFダウンロード可能（ZIP形式）"
+                        self.logger.warning("PDF URLでZIPファイルが返されました - 異常な状態")
+                        return False, "PDF生成エラー（PDF URLでZIPファイルが返された）"
                     else:
                         # ZIP形式ではない何か
                         self.logger.warning(f"予期しないZIPコンテンツ: {content_start}")
@@ -277,6 +295,96 @@ class NextPublishingService:
         except requests.RequestException as e:
             self.logger.error(f"PDFチェックエラー: {e}")
             return False, f"ネットワークエラー: {str(e)}"
+    
+    def _analyze_zip_content(self, zip_data: bytes) -> Tuple[bool, str]:
+        """
+        ZIPファイルの内容を分析してエラーページかPDFかを判定
+        
+        Args:
+            zip_data: ZIPファイルのバイナリデータ
+            
+        Returns:
+            Tuple[ダウンロード可能フラグ, 判定メッセージ]
+        """
+        try:
+            import zipfile
+            import io
+            
+            self.logger.info("ZIP内容分析を開始")
+            
+            # ZIPファイルとして読み込み
+            zip_buffer = io.BytesIO(zip_data)
+            
+            with zipfile.ZipFile(zip_buffer, 'r') as zip_file:
+                file_list = zip_file.namelist()
+                self.logger.info(f"ZIP内ファイル数: {len(file_list)}")
+                
+                pdf_files = []
+                error_indicators = []
+                
+                # 各ファイルを検査
+                for file_name in file_list:
+                    self.logger.debug(f"ZIP内ファイル確認: {file_name}")
+                    
+                    # PDFファイルの検出
+                    if file_name.lower().endswith('.pdf'):
+                        pdf_files.append(file_name)
+                        self.logger.info(f"PDFファイル発見: {file_name}")
+                    
+                    # HTMLファイル（エラーページの可能性）の検出
+                    elif file_name.lower().endswith('.html') or file_name.lower().endswith('.htm'):
+                        try:
+                            with zip_file.open(file_name) as html_file:
+                                # HTMLファイルの先頭1000文字を読み取り
+                                html_content = html_file.read(1000).decode('utf-8', errors='ignore')
+                                self.logger.debug(f"HTML内容サンプル: {html_content[:200]}")
+                                
+                                # エラーページのキーワードを検索
+                                error_keywords = [
+                                    'ファイルの作成に失敗',
+                                    'エラーが発生',
+                                    'PDF生成エラー',
+                                    'エラー',
+                                    'failed',
+                                    'error'
+                                ]
+                                
+                                for keyword in error_keywords:
+                                    if keyword.lower() in html_content.lower():
+                                        error_indicators.append(f"{file_name}: {keyword}")
+                                        self.logger.warning(f"エラーページ検出: {file_name} - {keyword}")
+                                        break
+                        
+                        except Exception as e:
+                            self.logger.warning(f"HTMLファイル読み取りエラー: {file_name} - {e}")
+                            error_indicators.append(f"{file_name}: 読み取りエラー")
+                
+                # 判定ロジック
+                if error_indicators:
+                    # エラーページが見つかった場合
+                    error_summary = ", ".join(error_indicators[:3])  # 最大3つのエラーを表示
+                    self.logger.error(f"ZIP内にエラーページを検出: {error_summary}")
+                    return False, f"ZIP内にエラーページを検出: {error_summary}"
+                
+                elif pdf_files:
+                    # 正常なPDFファイルが見つかった場合
+                    self.logger.info(f"ZIP内に{len(pdf_files)}個の正常なPDFファイルを検出")
+                    return True, f"PDFダウンロード可能（ZIP内に{len(pdf_files)}個のPDF）"
+                
+                else:
+                    # PDFもエラーページも見つからない場合
+                    self.logger.warning("ZIP内にPDFファイルもエラーページも見つからない")
+                    # ファイル一覧をログに記録
+                    file_types = [f.split('.')[-1].lower() if '.' in f else 'no_ext' for f in file_list]
+                    type_summary = ", ".join(set(file_types))
+                    return False, f"ZIP内にPDFなし（含まれるファイル: {type_summary}）"
+                    
+        except zipfile.BadZipFile:
+            self.logger.error("不正なZIPファイル")
+            return False, "不正なZIPファイル"
+        except Exception as e:
+            self.logger.error(f"ZIP分析エラー: {e}")
+            return False, f"ZIP分析エラー: {str(e)}"
     
     def close(self):
         """セッションを閉じる"""

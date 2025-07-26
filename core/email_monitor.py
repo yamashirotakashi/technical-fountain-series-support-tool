@@ -60,7 +60,8 @@ class EmailMonitor:
     
     def wait_for_email(self, subject_pattern: str = "Re:VIEW to 超原稿用紙", 
                       timeout: int = 600, check_interval: int = 10,
-                      return_with_filename: bool = False) -> Optional[str]:
+                      return_with_filename: bool = False,
+                      since_time: Optional[datetime] = None) -> Optional[str]:
         """
         特定の件名のメールを待機してダウンロードURLを取得
         
@@ -69,6 +70,7 @@ class EmailMonitor:
             timeout: タイムアウト時間（秒）
             check_interval: チェック間隔（秒）
             return_with_filename: ファイル名とURLのタプルで返すかどうか
+            since_time: この時刻以降のメールのみ検索（指定しない場合は現在時刻）
         
         Returns:
             ダウンロードURL、またはreturn_with_filenameがTrueの場合は(URL, ファイル名)のタプル
@@ -76,15 +78,19 @@ class EmailMonitor:
         if not self.connection:
             self.connect()
         
+        # since_timeが指定されていない場合は現在時刻を使用
+        search_since_time = since_time if since_time else datetime.now()
         start_time = datetime.now()
         end_time = start_time + timedelta(seconds=timeout)
         
         self.logger.info(f"メール待機開始: 件名 '{subject_pattern}' (タイムアウト: {timeout}秒)")
+        if since_time:
+            self.logger.info(f"検索対象: {search_since_time.isoformat()}以降のメール")
         
         while datetime.now() < end_time:
             try:
                 # 新しいメールを検索
-                since_date = start_time.strftime("%d-%b-%Y")
+                since_date = search_since_time.strftime("%d-%b-%Y")
                 
                 # 日本語を含む検索の場合は特別な処理
                 if any(ord(c) > 127 for c in subject_pattern):
@@ -134,6 +140,20 @@ class EmailMonitor:
                                         
                                         # 件名パターンと一致するか確認
                                         if subject_pattern in decoded_subject:
+                                            # since_timeが指定されている場合は時刻チェック
+                                            if since_time:
+                                                email_date = msg.get('Date')
+                                                if email_date:
+                                                    try:
+                                                        from email.utils import parsedate_to_datetime
+                                                        email_datetime = parsedate_to_datetime(email_date)
+                                                        # タイムゾーンを考慮した比較
+                                                        if email_datetime.replace(tzinfo=None) < since_time.replace(tzinfo=None):
+                                                            self.logger.debug(f"メール時刻が検索範囲外: {email_datetime} < {since_time}")
+                                                            continue
+                                                    except Exception as e:
+                                                        self.logger.warning(f"メール時刻解析エラー: {e}")
+                                            
                                             self.logger.info(f"該当するメールを発見: ID {email_id}, 件名: {decoded_subject}")
                                             
                                             # URLを抽出（ファイル名付きで返すオプション）

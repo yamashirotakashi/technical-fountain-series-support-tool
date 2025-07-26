@@ -147,14 +147,6 @@ class MainWindow(QMainWindow):
         # セパレータ
         tools_menu.addSeparator()
         
-        # Pre-flight Checkアクション
-        preflight_action = QAction("Pre-flight Check(&P)", self)
-        preflight_action.triggered.connect(self.show_preflight_check)
-        tools_menu.addAction(preflight_action)
-        
-        # セパレータ
-        tools_menu.addSeparator()
-        
         # リポジトリ設定アクション
         repo_settings_action = QAction("リポジトリ設定(&R)", self)
         repo_settings_action.triggered.connect(self.show_repository_settings)
@@ -179,7 +171,7 @@ class MainWindow(QMainWindow):
         # 入力パネルからのシグナル
         self.input_panel.processing_requested.connect(self.start_processing)
         self.input_panel.settings_requested.connect(self.show_process_mode_dialog)
-        self.input_panel.preflight_requested.connect(self.show_preflight_check)
+        # self.input_panel.preflight_requested.connect(self.show_preflight_check)  # 削除
         self.input_panel.error_check_requested.connect(self.start_error_detection)
     
     @pyqtSlot(list)
@@ -442,25 +434,7 @@ class MainWindow(QMainWindow):
             self.log_panel.append_log(f"処理方式を変更: {mode_text}", "INFO")
             self.status_bar.showMessage(f"処理方式: {mode_text}")
     
-    @pyqtSlot()
-    def show_preflight_check(self):
-        """Pre-flight Checkダイアログを表示"""
-        from gui.dialogs.preflight_dialog import PreflightDialog
-        
-        # 現在処理中でないかチェック
-        if self.worker_thread and self.worker_thread.isRunning():
-            QMessageBox.warning(
-                self,
-                "処理中",
-                "現在処理中です。処理が完了してからPre-flight Checkを実行してください。"
-            )
-            return
-            
-        # ダイアログを作成して表示
-        self.preflight_dialog = PreflightDialog(self)
-        self.preflight_dialog.show()
-        
-        self.log_panel.append_log("Pre-flight Check機能を起動しました", "INFO")
+    # Pre-flight Check関数を削除
         
     @pyqtSlot(list, str)
     def on_warning_dialog_needed(self, messages, result_type):
@@ -575,10 +549,27 @@ class MainWindow(QMainWindow):
                 self.processor.process_n_codes_with_error_detection(self.n_codes)
         
         self.error_detection_thread = ErrorDetectionWorker(self.error_detection_processor, n_codes)
-        self.error_detection_thread.finished.connect(lambda: self.log_panel.append_log("エラー検知スレッド終了", "DEBUG"))
+        self.error_detection_thread.finished.connect(self.on_error_detection_finished)
         self.error_detection_thread.start()
         
         self.status_bar.showMessage("エラーファイル検知中...")
+    
+    @pyqtSlot()
+    def on_error_detection_finished(self):
+        """エラー検知処理完了時の処理"""
+        self.log_panel.append_log("エラー検知処理が完了しました", "INFO")
+        
+        # 画面を初期状態に戻す
+        self.input_panel.set_enabled(True)
+        self.progress_panel.reset()
+        self.status_bar.showMessage("準備完了")
+        
+        # ログに区切り線を追加
+        self.log_panel.append_log("=" * 50, "INFO")
+        
+        # スレッドのクリーンアップ
+        if self.error_detection_thread:
+            self.error_detection_thread = None
     
     @pyqtSlot(str, bool, str)
     def on_file_processed(self, filename, success, message):

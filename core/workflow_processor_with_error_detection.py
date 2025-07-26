@@ -259,9 +259,19 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
                 self.emit_status(f"Word2XHTML5検証中: バッチ {batch_num}")
                 self.emit_log(f"バッチ {batch_num} をアップロード中...", "INFO")
                 
-                # アップロード前にメール監視開始時刻を記録
+                # アップロード前にメール監視開始時刻を記録（Gmail API優先）
                 if email_monitor:
-                    email_monitor.reset_processed_emails()  # 処理済みメールをリセット
+                    # Gmail API監視を試行
+                    try:
+                        from core.gmail_oauth_monitor import GmailOAuthMonitor
+                        gmail_monitor = GmailOAuthMonitor("config/gmail_oauth_credentials.json")
+                        gmail_monitor.authenticate()
+                        email_monitor = gmail_monitor  # Gmail APIに切り替え
+                        self.emit_log("Gmail API監視を有効化しました", "INFO")
+                    except Exception as e:
+                        self.emit_log(f"Gmail API使用不可、IMAPにフォールバック: {e}", "WARNING")
+                        email_monitor.reset_processed_emails()  # IMAPの場合のみリセット
+                    
                     upload_start_time = datetime.now(timezone.utc)
                     self.emit_log(f"アップロード開始時刻: {upload_start_time.isoformat()}", "DEBUG")
                 
@@ -399,7 +409,8 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
                 subject_pattern="ダウンロード用URLのご案内",
                 timeout=check_interval,
                 check_interval=5,
-                return_with_filename=True
+                return_with_filename=True,
+                since_time=upload_start_time
             )
             
             if result:
