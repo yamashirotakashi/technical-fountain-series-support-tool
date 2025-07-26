@@ -246,6 +246,9 @@ class MainWindow(QMainWindow):
         for n_code in n_codes:
             self.log_panel.append_log(f"キューに追加: {n_code}", "INFO")
         
+        # デバッグ：現在の処理モードを確認
+        self.log_panel.append_log(f"[DEBUG] 処理開始時のprocess_mode = {repr(self.process_mode)}", "DEBUG")
+        
         # ワーカースレッドを作成して開始
         self.worker_thread = ProcessWorker(n_codes, email_password, self.process_mode)
         self.worker_thread.progress_updated.connect(self.progress_panel.update_progress)
@@ -441,9 +444,20 @@ class MainWindow(QMainWindow):
         dialog = ProcessModeDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.process_mode = dialog.get_selected_mode()
-            mode_text = "API方式" if self.process_mode == ProcessModeDialog.MODE_API else "従来方式"
+            
+            # モードテキストマッピング
+            mode_text_map = {
+                ProcessModeDialog.MODE_API: "API方式",
+                ProcessModeDialog.MODE_TRADITIONAL: "従来方式",
+                ProcessModeDialog.MODE_GMAIL_API: "Gmail API方式"
+            }
+            mode_text = mode_text_map.get(self.process_mode, "不明")
+            
             self.log_panel.append_log(f"処理方式を変更: {mode_text}", "INFO")
             self.status_bar.showMessage(f"処理方式: {mode_text}")
+            
+            # デバッグログ
+            self.log_panel.append_log(f"[DEBUG] process_mode = {repr(self.process_mode)}", "DEBUG")
     
     # Pre-flight Check関数を削除
         
