@@ -24,7 +24,7 @@ class LogPanel(QWidget):
         layout = QVBoxLayout(self)
         
         # Group box
-        group_box = QGroupBox("Processing Log")
+        group_box = QGroupBox("処理ログ")
         group_box.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
@@ -60,7 +60,7 @@ class LogPanel(QWidget):
         button_layout = QHBoxLayout()
         
         # Clear button
-        self.clear_button = QPushButton("Clear Log")
+        self.clear_button = QPushButton("ログをクリア")
         self.clear_button.clicked.connect(self.clear_logs)
         self.clear_button.setStyleSheet("""
             QPushButton {

@@ -336,24 +336,32 @@ class MainWindow(QMainWindow):
             file_list_str = "\n".join([f"• {name}" for name in file_names])
             
             # 最初の確認ダイアログ
-            reply = QMessageBox.question(
-                self,
-                "ファイル配置確認",
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("ファイル配置確認")
+            msg_box.setText(
                 f"以下のフォルダに{len(file_list)}個のWordファイル（1行目削除済み）を配置します。\n\n"
                 f"配置先: {honbun_folder_path}\n\n"
                 f"ファイル:\n{file_list_str}\n\n"
-                f"全てのファイルを配置しますか？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Yes
+                f"全てのファイルを配置しますか？"
             )
             
-            if reply == QMessageBox.StandardButton.Cancel:
+            # カスタムボタンを追加
+            place_all_btn = msg_box.addButton("配置", QMessageBox.ButtonRole.YesRole)
+            select_files_btn = msg_box.addButton("一部ファイルを選択", QMessageBox.ButtonRole.NoRole)
+            cancel_btn = msg_box.addButton("キャンセル", QMessageBox.ButtonRole.RejectRole)
+            
+            msg_box.setDefaultButton(place_all_btn)
+            msg_box.exec()
+            
+            clicked_button = msg_box.clickedButton()
+            
+            if clicked_button == cancel_btn:
                 self.log_panel.append_log("ファイル配置がキャンセルされました", "INFO")
                 if callback:
                     callback([])
                 return
             
-            if reply == QMessageBox.StandardButton.No:
+            if clicked_button == select_files_btn:
                 # 一部ファイルのみ選択
                 dialog = SimpleFileSelectorDialog(file_list, self)
                 if dialog.exec() == QDialog.DialogCode.Accepted:

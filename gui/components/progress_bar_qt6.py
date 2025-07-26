@@ -27,7 +27,7 @@ class ProgressPanel(QWidget):
         layout = QVBoxLayout(self)
         
         # Group box
-        group_box = QGroupBox("Processing Progress")
+        group_box = QGroupBox("処理進行状況")
         group_box.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
@@ -46,18 +46,18 @@ class ProgressPanel(QWidget):
         group_layout = QVBoxLayout(group_box)
         
         # Status label
-        self.status_label = QLabel("Ready")
+        self.status_label = QLabel("準備完了")
         self.status_label.setStyleSheet("color: #666; margin-bottom: 5px;")
         
         # Progress info layout
         info_layout = QHBoxLayout()
         
         # Progress label
-        self.progress_label = QLabel("0 / 0 items")
+        self.progress_label = QLabel("0 / 0 項目")
         self.progress_label.setStyleSheet("color: #333;")
         
         # Cancel button
-        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button = QPushButton("キャンセル")
         self.cancel_button.clicked.connect(self.cancel_requested.emit)
         self.cancel_button.setEnabled(False)
         self.cancel_button.setStyleSheet("""
@@ -146,7 +146,7 @@ class ProgressPanel(QWidget):
     
     def update_label(self):
         """Update progress label"""
-        self.progress_label.setText(f"{self.completed_items} / {self.total_items} items")
+        self.progress_label.setText(f"{self.completed_items} / {self.total_items} 項目")
     
     def reset(self):
         """Reset progress"""
@@ -154,7 +154,7 @@ class ProgressPanel(QWidget):
         self.completed_items = 0
         self.progress_bar.setValue(0)
         self.progress_bar.setMaximum(100)
-        self.status_label.setText("Processing...")
+        self.status_label.setText("処理中...")
         self.update_label()
         self.cancel_button.setEnabled(True)
     

@@ -29,7 +29,7 @@ class InputPanel(QWidget):
         layout = QVBoxLayout(self)
         
         # Group box
-        group_box = QGroupBox("N-Code Input")
+        group_box = QGroupBox("Nコード入力")
         group_box.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
@@ -49,9 +49,9 @@ class InputPanel(QWidget):
         
         # Description label
         description_label = QLabel(
-            "Enter the N-codes you want to process.\n"
-            "Multiple codes can be separated by comma (,), tab, space, or newline.\n"
-            "Example: N00001, N00002 or N00001[Tab]N00002 or one per line"
+            "処理するNコードを入力してください。\n"
+            "複数のコードはカンマ (,)、タブ、スペース、または改行で区切ることができます。\n"
+            "例: N00001, N00002 または N00001[Tab]N00002 または1行に1つ"
         )
         description_label.setStyleSheet("color: #666; margin-bottom: 10px;")
         
@@ -76,7 +76,7 @@ class InputPanel(QWidget):
         button_layout = QHBoxLayout()
         
         # Process button
-        self.process_button = QPushButton("Start Processing")
+        self.process_button = QPushButton("処理開始")
         self.process_button.clicked.connect(self.on_process_clicked)
         self.process_button.setStyleSheet("""
             QPushButton {
@@ -101,7 +101,7 @@ class InputPanel(QWidget):
         """)
         
         # Clear button
-        self.clear_button = QPushButton("Clear")
+        self.clear_button = QPushButton("クリア")
         self.clear_button.clicked.connect(self.clear_input)
         self.clear_button.setStyleSheet("""
             QPushButton {
@@ -122,7 +122,7 @@ class InputPanel(QWidget):
         """)
         
         # Settings button
-        self.settings_button = QPushButton("Settings")
+        self.settings_button = QPushButton("設定")
         self.settings_button.clicked.connect(self.on_settings_clicked)
         self.settings_button.setStyleSheet("""
             QPushButton {
