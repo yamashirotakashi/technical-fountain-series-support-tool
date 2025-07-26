@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# 技術の泉シリーズ制作支援ツール - PyInstaller設定 (Qt6版)
+# 技術の泉シリーズ制作支援ツール - PyInstaller設定
 
 import sys
 from pathlib import Path
@@ -12,7 +12,7 @@ BASE_DIR = Path(os.getcwd())
 ICON_FILE = BASE_DIR / 'assets' / 'icon.ico' if (BASE_DIR / 'assets' / 'icon.ico').exists() else None
 
 a = Analysis(
-    ['main_qt6.py'],
+    ['main.py'],
     pathex=[str(BASE_DIR)],
     binaries=[],
     datas=[
@@ -66,7 +66,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='TechZip_Qt6_New',
+    name='TechZip',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -85,13 +85,13 @@ exe = EXE(
 # 追加の設定情報をコメントとして記載
 """
 ビルドコマンド:
-    pyinstaller techzip_qt6.spec
+    pyinstaller techzip.spec
 
 または、初回ビルド時:
-    pyinstaller --onefile --windowed --name TechZip_Qt6 main_qt6.py
+    pyinstaller --onefile --windowed --name TechZip main.py
 
 ビルド後の確認:
-    1. dist/TechZip_Qt6.exe が作成されていることを確認
+    1. dist/TechZip.exe が作成されていることを確認
     2. configフォルダがexeと同じディレクトリに必要
     3. .envファイルを配置（必要に応じて）
 """
