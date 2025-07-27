@@ -139,3 +139,17 @@ GMAIL_APP_PASSWORD=your_app_password_here
   2. ローカルキャッシュ機能（`~/.techzip/repo_cache`）
   3. GUIからのリポジトリ設定管理（ツール→リポジトリ設定）
   4. 環境変数`GITHUB_TOKEN`によるプライベートリポジトリ対応
+
+## 🎯 次期開発計画（2025-01-27策定）
+
+### Phase 1: Slack統合（2025年2月予定）
+- PDF生成完了後の自動Slack投稿機能
+- 新規にSlack Bot作成（PDF投稿機能）
+- 「完了後Slackに投稿」オプション追加
+- 詳細: `/docs/TECHZIP_DEVELOPMENT_ROADMAP.md`
+
+### Phase 2: TechZip Admin（2025年3月予定）
+- プロジェクト初期化専用の管理者ツール（別アプリ）
+- Slack/GitHubリソースの一括作成
+- 高権限操作の安全な実行
+- 詳細: `/docs/project_initialization_automation_research.md`

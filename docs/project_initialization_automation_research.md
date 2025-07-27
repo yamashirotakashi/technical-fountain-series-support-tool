@@ -1,166 +1,172 @@
-# プロジェクト初期化自動化 - 事前研究ドキュメント
+# プロジェクト初期化自動化 - 実装仕様書
 
 最終更新: 2025-01-27
 
 ## 概要
 
-技術の泉シリーズの新規プロジェクト開始時に必要なSlackチャネルとGitHubリポジトリの作成、設定、著者招待までの一連の作業を自動化する機能の実現可能性調査。
+技術の泉シリーズの新規プロジェクト開始時に必要なSlackチャネルとGitHubリポジトリの作成、設定、著者招待までの一連の作業を自動化する機能の実装仕様。
+
+## 実装要件
+
+### 必要な通知
+- **GitHub → Slack**: Push と Issue のみ（PR等は不要）
+
+### 著者管理
+- GitHubアカウントが既知の場合のみ初期招待
+- 不明な場合は後から手動招待（現状の運用を踏襲）
+
+### アカウント要件
+- **Slack**: 管理者権限（現在のチャネル作成者）を維持
+- **GitHub**: irdtechbook組織での作成権限
 
 ## 現在の手動作業フロー
 
 1. **Slack/GitHub同名リソース作成**
-   - プライベートSlackチャネル作成
-   - GitHubリポジトリ作成（同じ名前）
+   - プライベートSlackチャネル作成（管理者が作成）
+   - GitHubリポジトリ作成（irdtechbook組織、同じ名前）
 
 2. **Slack設定**
    - チャネルトピック設定（定型文）
    - チャネル説明設定（定型文）
    - スター付きセクション指定
-   - @github Bot招待
-   - `/github subscribe owner/repo` コマンド実行
+   - 既存のPDF投稿Bot招待
+   - GitHub連携設定
 
 3. **GitHub設定**
    - Description: 書籍名を設定
    - README.md: 定型内容で自動生成
+   - Issue機能有効化
 
 4. **著者招待**
    - Slack: メールアドレスで招待
-   - GitHub: GitHubアカウントまたはメールで招待
+   - GitHub: 既知のGitHubアカウントのみ招待
 
-## 自動化可能性の分析
+## 実装アーキテクチャ
 
-### Slack側の自動化
-
-| タスク | 自動化可否 | 使用API/方法 | 備考 |
-|--------|------------|--------------|------|
-| チャネル作成 | ✅ 可能 | `conversations.create` | is_private=true |
-| トピック設定 | ✅ 可能 | `conversations.setTopic` | |
-| 説明設定 | ✅ 可能 | `conversations.setPurpose` | |
-| スター付きセクション | ❌ 不可 | API未提供 | ピン留めで代替可 |
-| GitHub Bot招待 | ✅ 可能 | `conversations.invite` | Bot IDが必要 |
-| /github subscribe | ⚠️ 制限付き | 以下参照 | |
-| メール招待 | ⚠️ 制限付き | 以下参照 | |
-
-#### /github subscribeの実行方法
-
-1. **Webhook経由（推奨）**
-   ```python
-   # Incoming Webhookではなく、GitHub側でWebhook設定
-   github_client.create_webhook(
-       repo=repo_name,
-       config={"url": slack_webhook_url}
-   )
-   ```
-
-2. **Bot経由でコマンド送信**
-   ```python
-   # chat.postMessageでコマンドを送信（動作保証なし）
-   slack_client.chat_postMessage(
-       channel=channel_id,
-       text="/github subscribe owner/repo"
-   )
-   ```
-
-#### メール招待（無料プラン）
+### Bot統合設計
+Phase 1で作成するPDF投稿Botを流用・拡張して以下の機能を追加：
 
 ```python
-# 招待リンク生成
-response = slack_client.conversations_inviteShared(
-    channel=channel_id,
-    emails=["author@example.com"]
-)
-invite_link = response['invite_link']
-# メール送信は別途実装
+# 必要なOAuth Scopes
+OAuth Scopes:
+- files:write       # PDF投稿
+- chat:write        # メッセージ投稿
+- groups:read       # プライベートチャネル読取
+- groups:write      # チャネル作成・設定（プロジェクト初期化用）
+- incoming-webhook  # GitHub通知受信
 ```
 
-### GitHub側の自動化
-
-| タスク | 自動化可否 | 使用API | 備考 |
-|--------|------------|---------|------|
-| リポジトリ作成 | ✅ 可能 | `POST /user/repos` | |
-| Description設定 | ✅ 可能 | 作成時パラメータ | |
-| README生成 | ✅ 可能 | `PUT /repos/{owner}/{repo}/contents/README.md` | |
-| ユーザー招待 | ✅ 可能 | `PUT /repos/{owner}/{repo}/collaborators/{username}` | |
-| メール招待 | ❌ 不可 | GitHubユーザー名必須 | 事前マッピング必要 |
-
-### 実装例
+### トークン管理
 
 ```python
-import os
+class TokenManager:
+    def __init__(self):
+        # PDF投稿Botトークン（Phase 1で作成済み）
+        self.bot_token = os.environ['SLACK_BOT_TOKEN']
+        # 管理者User Token（チャネル作成用）
+        self.admin_token = os.environ['SLACK_ADMIN_TOKEN']
+        # irdtechbook組織のGitHub PAT
+        self.github_pat = os.environ['GITHUB_ORG_PAT']
+```
+
+### 実装詳細
+
+```python
 from slack_sdk import WebClient
 from github import Github
-import base64
+import os
+import time
 
-class ProjectInitializer:
-    def __init__(self, slack_token, github_token):
-        self.slack = WebClient(token=slack_token)
-        self.github = Github(github_token)
+class TechZipProjectInitializer:
+    def __init__(self):
+        self.slack_bot = WebClient(token=os.environ['SLACK_BOT_TOKEN'])
+        self.slack_admin = WebClient(token=os.environ['SLACK_ADMIN_TOKEN'])
+        self.github = Github(os.environ['GITHUB_ORG_PAT'])
+        self.org = self.github.get_organization("irdtechbook")
         
-    def create_project(self, project_config):
+    def create_project(self, config):
         """
-        project_config = {
+        config = {
             "name": "N12345-book-title",
             "book_title": "素晴らしい技術書",
             "authors": [
-                {"email": "author@example.com", "github": "author_username"}
-            ],
-            "topic_template": "📚 {book_title} の編集チャネル",
-            "purpose_template": "執筆・編集・校正の作業場所"
+                {"email": "author@example.com", "github": "author_username"},
+                {"email": "author2@example.com", "github": None}  # GitHub不明
+            ]
         }
         """
-        # 1. Slackチャネル作成
-        channel = self._create_slack_channel(project_config)
-        
-        # 2. GitHubリポジトリ作成
-        repo = self._create_github_repo(project_config)
-        
-        # 3. 連携設定
-        self._setup_integration(channel, repo)
-        
-        # 4. 著者招待
-        self._invite_authors(channel, repo, project_config["authors"])
-        
+        try:
+            # 1. Slackチャネル作成（管理者権限で）
+            channel = self._create_slack_channel(config)
+            
+            # 2. GitHubリポジトリ作成（irdtechbook組織）
+            repo = self._create_github_repository(config)
+            
+            # 3. GitHub-Slack連携設定（Push/Issueのみ）
+            self._setup_github_webhook(repo, channel['id'])
+            
+            # 4. 既知の著者のみ招待
+            self._invite_known_authors(channel, repo, config['authors'])
+            
+            return {
+                "success": True,
+                "channel_id": channel['id'],
+                "repo_url": repo.html_url,
+                "invited_authors": self._get_invited_count(config['authors'])
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
     def _create_slack_channel(self, config):
-        # チャネル作成
-        response = self.slack.conversations_create(
+        """管理者権限でチャネル作成"""
+        # チャネル作成（管理者トークン使用）
+        response = self.slack_admin.conversations_create(
             name=config["name"],
             is_private=True
         )
         channel_id = response["channel"]["id"]
         
         # トピック・説明設定
-        self.slack.conversations_setTopic(
+        self.slack_admin.conversations_setTopic(
             channel=channel_id,
-            topic=config["topic_template"].format(book_title=config["book_title"])
+            topic=f"📚 {config['book_title']} の編集チャネル"
         )
-        self.slack.conversations_setPurpose(
+        self.slack_admin.conversations_setPurpose(
             channel=channel_id,
-            purpose=config["purpose_template"]
+            purpose="執筆・編集・校正の作業場所"
         )
         
-        # 初回メッセージ（スター付きセクションの代替）
-        message = self.slack.chat_postMessage(
+        # PDF投稿Botを招待
+        self.slack_admin.conversations_invite(
             channel=channel_id,
-            text="📌 重要情報\n• GitHub: https://github.com/owner/{}\n• 書籍名: {}".format(
-                config["name"], config["book_title"]
-            )
+            users=os.environ['SLACK_BOT_USER_ID']  # PDF投稿BotのユーザーID
         )
-        # ピン留め
-        self.slack.pins_add(
+        
+        # 重要情報をピン留め（スター付きセクションの代替）
+        message = self.slack_bot.chat_postMessage(
+            channel=channel_id,
+            text=f"📌 重要情報\n"
+                 f"• GitHub: https://github.com/irdtechbook/{config['name']}\n"
+                 f"• 書籍名: {config['book_title']}\n"
+                 f"• PDF投稿: Nフォルダの組版結果を自動投稿します"
+        )
+        self.slack_bot.pins_add(
             channel=channel_id,
             timestamp=message["ts"]
         )
         
-        return channel_id
-        
-    def _create_github_repo(self, config):
-        # リポジトリ作成
-        user = self.github.get_user()
-        repo = user.create_repo(
+        return response["channel"]
+    
+    def _create_github_repository(self, config):
+        """irdtechbook組織でリポジトリ作成"""
+        repo = self.org.create_repo(
             name=config["name"],
             description=config["book_title"],
             private=True,
-            auto_init=False
+            has_issues=True,  # Issue機能有効
+            has_wiki=False,
+            has_downloads=False
         )
         
         # README作成
@@ -174,7 +180,7 @@ class ProjectInitializer:
 ## ディレクトリ構成
 ```
 ├── manuscripts/    # 原稿ファイル
-├── images/        # 画像ファイル
+├── images/        # 画像ファイル  
 ├── reviews/       # レビューコメント
 └── outputs/       # 組版結果
 ```
@@ -186,6 +192,9 @@ class ProjectInitializer:
 
 ## Slack連携
 Slackチャネル: #{config["name"]}
+
+## Issue管理
+バグ報告や改善提案はIssueに登録してください。
 """
         repo.create_file(
             "README.md",
@@ -194,88 +203,124 @@ Slackチャネル: #{config["name"]}
         )
         
         return repo
+    
+    def _setup_github_webhook(self, repo, channel_id):
+        """GitHub Webhook設定（Push/Issueのみ）"""
+        # Slackチャネル用のWebhook URL取得
+        webhook_url = self._get_or_create_webhook_url(channel_id)
+        
+        # GitHub Webhookを設定
+        repo.create_hook(
+            name="web",
+            config={
+                "url": webhook_url,
+                "content_type": "json",
+                "insecure_ssl": "0"
+            },
+            events=["push", "issues"],  # 必要なイベントのみ
+            active=True
+        )
+        
+    def _invite_known_authors(self, channel, repo, authors):
+        """既知の著者のみ招待"""
+        for author in authors:
+            # Slack招待（メールアドレスは必須）
+            if author.get("email"):
+                try:
+                    self.slack_admin.conversations_inviteShared(
+                        channel=channel["id"],
+                        emails=[author["email"]]
+                    )
+                except Exception as e:
+                    print(f"Slack招待エラー ({author['email']}): {e}")
+            
+            # GitHub招待（ユーザー名が既知の場合のみ）
+            if author.get("github"):
+                try:
+                    repo.add_to_collaborators(
+                        author["github"],
+                        permission="push"
+                    )
+                except Exception as e:
+                    print(f"GitHub招待エラー ({author['github']}): {e}")
 ```
 
-## 自動化の制約と解決策
+## GUI統合
 
-### 制約事項
+TechZipのGUIに「プロジェクト初期化」メニューを追加：
 
-1. **スター付きセクション**
-   - Slack APIで未対応
-   - 解決策: 重要メッセージのピン留めで代替
+```python
+# main_window.py への追加
+def init_project_menu(self):
+    """プロジェクト初期化メニュー"""
+    project_menu = self.menuBar().addMenu("プロジェクト")
+    
+    init_action = QAction("新規プロジェクト作成", self)
+    init_action.triggered.connect(self.show_project_init_dialog)
+    project_menu.addAction(init_action)
 
-2. **Slashコマンド実行**
-   - Bot経由での実行は不確実
-   - 解決策: GitHub Webhookを直接設定
-
-3. **メールアドレスからの招待**
-   - Slack無料プラン: 招待リンク生成＋メール送信
-   - GitHub: ユーザー名が必須（メールマッピング管理必要）
-
-4. **権限要件**
-   - Slack: 管理者権限のUser Token
-   - GitHub: Personal Access Token (repo, admin:org権限)
-
-### 推奨アーキテクチャ
-
-```
-TechZip GUI
-    ↓
-Project Initializer
-    ├── Slack Manager
-    │   ├── Channel Creator
-    │   ├── Settings Configurator
-    │   └── Invitation Handler
-    ├── GitHub Manager
-    │   ├── Repository Creator
-    │   ├── README Generator
-    │   └── Collaborator Manager
-    └── Integration Manager
-        ├── GitHub App Setup
-        └── Webhook Configurator
+def show_project_init_dialog(self):
+    """プロジェクト初期化ダイアログ表示"""
+    dialog = ProjectInitDialog(self)
+    if dialog.exec_():
+        config = dialog.get_config()
+        self.init_project(config)
 ```
 
-## 実装ロードマップ
+## エラーハンドリング
 
-### Phase 1: 基本機能（1-2週間）
-- Slack/GitHubリポジトリ作成
-- 基本設定（トピック、説明、README）
-- 手動確認ポイントの明確化
+```python
+class ProjectInitError(Exception):
+    """プロジェクト初期化エラー"""
+    pass
 
-### Phase 2: 連携機能（1週間）
-- GitHub Bot招待
-- Webhook設定
-- 招待リンク生成
-
-### Phase 3: 完全自動化（1週間）
-- 著者情報管理システム
-- メール送信統合
-- エラーハンドリング強化
-
-## 期待される効果
-
-- **作業時間**: 30分 → 2-3分（93%削減）
-- **自動化率**: 約85%（スター付きセクション以外）
-- **ヒューマンエラー**: 大幅削減
-- **標準化**: 全プロジェクトで統一された構成
+def handle_init_error(self, error):
+    """エラー処理とロールバック"""
+    if isinstance(error, SlackError):
+        # Slackチャネル作成失敗
+        QMessageBox.critical(self, "エラー", 
+            f"Slackチャネル作成に失敗しました: {error}")
+    elif isinstance(error, GithubException):
+        # GitHubリポジトリ作成失敗
+        # 作成済みのSlackチャネルの処理を検討
+        pass
+```
 
 ## セキュリティ考慮事項
 
 1. **トークン管理**
-   - 環境変数または暗号化設定
+   - 環境変数でトークン管理
+   - GUI設定画面でのトークン暗号化保存
    - 最小権限の原則
 
 2. **アクセス制御**
-   - プライベートチャネル/リポジトリ
-   - 招待者の検証
+   - プライベートチャネル/リポジトリのみ
+   - 招待者の事前検証
 
-3. **ログ記録**
-   - 全操作の監査ログ
-   - エラー時の詳細記録
+3. **監査ログ**
+   - 全操作をログファイルに記録
+   - エラー発生時の詳細情報保存
 
-## 次のステップ
+## 実装ロードマップ
 
-1. プロトタイプ実装（Slack/GitHub個別）
-2. 統合テスト環境構築
-3. UI設計（プロジェクト設定画面）
-4. 本番環境での試験運用
+### Phase 1: 基本実装（1週間）
+- [ ] ProjectInitializerクラス実装
+- [ ] Slack/GitHub個別テスト
+- [ ] エラーハンドリング基本実装
+
+### Phase 2: GUI統合（3日）
+- [ ] プロジェクト初期化ダイアログ
+- [ ] 設定管理画面
+- [ ] 進捗表示
+
+### Phase 3: 本番投入（3日）
+- [ ] 新規PDF投稿Botの作成と設定
+- [ ] 本番環境でのテスト
+- [ ] ドキュメント作成
+
+## 期待される効果
+
+- **作業時間**: 30分 → 2-3分（93%削減）
+- **自動化率**: 約85%
+- **ヒューマンエラー**: 大幅削減
+- **標準化**: 全プロジェクトで統一された構成
