@@ -41,6 +41,12 @@ techbook-analytics-*.json
 *.key
 *.pem
 
+# Gmail OAuth
+config/gmail_oauth_credentials.json
+config/gmail_token.pickle
+gmail_token.pickle
+*_token.pickle
+
 # User settings
 .techzip/
 
