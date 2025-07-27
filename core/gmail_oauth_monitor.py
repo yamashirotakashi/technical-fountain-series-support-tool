@@ -32,9 +32,17 @@ class GmailOAuthMonitor:
         self.logger = get_logger(__name__)
         self.config = get_config()
         
-        # 認証設定
-        self.credentials_path = credentials_path or "config/gmail_oauth_credentials.json"
-        self.token_path = "config/gmail_token.pickle"
+        # EXE環境対応
+        from core.gmail_oauth_exe_helper import gmail_oauth_helper
+        self.exe_helper = gmail_oauth_helper
+        
+        # 認証設定（EXE環境対応）
+        if credentials_path:
+            self.credentials_path = credentials_path
+            self.token_path = str(Path(credentials_path).parent / "gmail_token.pickle")
+        else:
+            self.credentials_path, self.token_path = self.exe_helper.get_credentials_path()
+        
         self.service = None
         
         # Gmail APIスコープ（読み取り専用）
@@ -66,7 +74,9 @@ class GmailOAuthMonitor:
                 
                 flow = InstalledAppFlow.from_client_secrets_file(
                     self.credentials_path, self.scopes)
-                creds = flow.run_local_server(port=0)
+                # EXE環境対応のポート設定
+                port = self.exe_helper.get_oauth_port()
+                creds = flow.run_local_server(port=port)
                 self.logger.info("新しいOAuth2.0認証を完了しました")
             
             # トークンを保存
