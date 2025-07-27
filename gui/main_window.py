@@ -184,8 +184,33 @@ class MainWindow(QMainWindow):
         Args:
             n_codes: 処理するNコードのリスト
         """
+        # まず処理方式を選択
+        dialog = ProcessModeDialog(self)
+        # 現在の処理方式を反映
+        if self.process_mode == ProcessModeDialog.MODE_TRADITIONAL:
+            dialog.traditional_radio.setChecked(True)
+        elif self.process_mode == ProcessModeDialog.MODE_API:
+            dialog.api_radio.setChecked(True)
+        elif self.process_mode == ProcessModeDialog.MODE_GMAIL_API:
+            dialog.gmail_api_radio.setChecked(True)
+        
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        
+        # 選択された処理方式を取得
+        self.process_mode = dialog.get_selected_mode()
+        
+        # モードテキストマッピング
+        mode_text_map = {
+            ProcessModeDialog.MODE_API: "API方式",
+            ProcessModeDialog.MODE_TRADITIONAL: "従来方式",
+            ProcessModeDialog.MODE_GMAIL_API: "Gmail API方式"
+        }
+        mode_text = mode_text_map.get(self.process_mode, "不明")
+        self.log_panel.append_log(f"処理方式: {mode_text}", "INFO")
+        
         # 確認ダイアログ
-        message = f"以下のNコードを処理します:\n" + "\n".join(n_codes)
+        message = f"処理方式: {mode_text}\n\n以下のNコードを処理します:\n" + "\n".join(n_codes)
         reply = QMessageBox.question(
             self,
             "処理の確認",
@@ -443,14 +468,17 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def show_process_mode_dialog(self):
         """処理方式選択ダイアログを表示"""
-        print("[DEBUG] show_process_mode_dialog called")
         dialog = ProcessModeDialog(self)
-        result = dialog.exec()
-        print(f"[DEBUG] dialog.exec() result: {result}")
+        # 現在の処理方式を反映
+        if self.process_mode == ProcessModeDialog.MODE_TRADITIONAL:
+            dialog.traditional_radio.setChecked(True)
+        elif self.process_mode == ProcessModeDialog.MODE_API:
+            dialog.api_radio.setChecked(True)
+        elif self.process_mode == ProcessModeDialog.MODE_GMAIL_API:
+            dialog.gmail_api_radio.setChecked(True)
         
-        if result == QDialog.DialogCode.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.process_mode = dialog.get_selected_mode()
-            print(f"[DEBUG] MainWindow - 取得したモード: {self.process_mode}")
             
             # モードテキストマッピング
             mode_text_map = {
@@ -462,11 +490,6 @@ class MainWindow(QMainWindow):
             
             self.log_panel.append_log(f"処理方式を変更: {mode_text}", "INFO")
             self.status_bar.showMessage(f"処理方式: {mode_text}")
-            
-            # デバッグログ
-            self.log_panel.append_log(f"[DEBUG] process_mode = {repr(self.process_mode)}", "DEBUG")
-        else:
-            print("[DEBUG] ダイアログがキャンセルされました")
     
     # Pre-flight Check関数を削除
         

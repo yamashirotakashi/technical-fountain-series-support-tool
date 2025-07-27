@@ -288,8 +288,30 @@ class WorkflowProcessor(QObject):
             if self.email_password:
                 self.emit_log("変換完了メールを待機中...", "INFO")
                 
+                # 現在時刻を記録（この時刻以降のメールのみを対象にする）
+                import datetime
+                # タイムゾーンを考慮
+                upload_time = datetime.datetime.now()
+                self.emit_log(f"アップロード時刻: {upload_time.isoformat()}", "DEBUG")
+                
                 # email_monitorプロパティを使用（遅延初期化）
-                download_url = self.email_monitor.wait_for_email()
+                if hasattr(self.email_monitor, 'wait_for_email'):
+                    # Gmail API方式の場合、since_timeとfrom_addressパラメータが使える
+                    try:
+                        # 従来方式と同じ件名パターンを使用
+                        # 一時的に時刻フィルタを無効にしてテスト
+                        download_url = self.email_monitor.wait_for_email(
+                            subject_pattern="Re:VIEW to 超原稿用紙",
+                            since_time=None,  # 時刻フィルタを一時的に無効化
+                            from_address="kanazawa@nextpublishing.jp"
+                        )
+                    except TypeError:
+                        # パラメータがサポートされていない場合（従来のIMAPの場合）
+                        download_url = self.email_monitor.wait_for_email(
+                            subject_pattern="Re:VIEW to 超原稿用紙"
+                        )
+                else:
+                    download_url = self.email_monitor.wait_for_email()
                 
                 if not download_url:
                     raise ValueError("タイムアウト: メールが届きませんでした")

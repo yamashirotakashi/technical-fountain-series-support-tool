@@ -11,7 +11,7 @@ class InputPanel(QWidget):
     """N-code input panel widget"""
     
     # Custom signals
-    processing_requested = pyqtSignal(list, int)  # Send N-code list and process mode
+    processing_requested = pyqtSignal(list)  # Send N-code list
     settings_requested = pyqtSignal()  # Settings button clicked
     # preflight_requested = pyqtSignal()  # Pre-flight Check button clicked (削除)
     error_check_requested = pyqtSignal(list)  # Error file detection requested
@@ -230,12 +230,7 @@ class InputPanel(QWidget):
         """Handler for process button click"""
         if self.validate_input():
             n_codes = self.get_n_codes()
-            # Show process mode dialog
-            from gui.dialogs.process_mode_dialog import ProcessModeDialog
-            dialog = ProcessModeDialog(self)
-            if dialog.exec() == dialog.DialogCode.Accepted:
-                process_mode = dialog.get_selected_mode()
-                self.processing_requested.emit(n_codes, process_mode)
+            self.processing_requested.emit(n_codes)
     
     def clear_input(self):
         """Clear input"""

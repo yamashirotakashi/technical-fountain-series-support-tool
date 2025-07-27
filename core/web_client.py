@@ -136,6 +136,31 @@ class WebClient:
                                     self._last_progress = progress
                 
                 self.logger.info(f"ダウンロード完了: {save_path}")
+                
+                # ダウンロードしたファイルの情報をログ
+                file_size = save_path.stat().st_size
+                self.logger.info(f"保存されたファイルサイズ: {file_size:,} bytes")
+                
+                # 最初の数バイトを確認してファイルタイプを判定
+                with open(save_path, 'rb') as f:
+                    header = f.read(100)
+                    # ZIPファイルのマジックナンバー: PK (0x504B)
+                    if header.startswith(b'PK'):
+                        self.logger.info("ファイルタイプ: ZIP形式")
+                    # HTMLの可能性
+                    elif header.lower().startswith(b'<!doctype') or header.lower().startswith(b'<html'):
+                        self.logger.warning("ファイルタイプ: HTML形式（エラーページの可能性）")
+                        # HTMLの内容の一部をログ
+                        try:
+                            content = save_path.read_text(encoding='utf-8', errors='ignore')[:500]
+                            self.logger.warning(f"HTML内容の冒頭: {content}")
+                        except:
+                            pass
+                    else:
+                        # 最初の100バイトを16進数で表示
+                        hex_header = header[:50].hex()
+                        self.logger.warning(f"不明なファイルタイプ。ヘッダー: {hex_header}")
+                
                 return True
             else:
                 self.logger.error(f"ダウンロードに失敗: HTTP {response.status_code}")
