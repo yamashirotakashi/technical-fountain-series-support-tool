@@ -5,7 +5,7 @@ import json
 import os
 import pickle
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional, Tuple, List, Dict
 
@@ -17,20 +17,24 @@ from googleapiclient.errors import HttpError
 
 from utils.logger import get_logger
 from utils.config import get_config
+from core.email_processors import EmailProcessor, create_email_processor
 
 
 class GmailOAuthMonitor:
     """Gmail API OAuth2.0認証を使用してメールを監視するクラス"""
     
-    def __init__(self, credentials_path: str = None):
+    def __init__(self, credentials_path: str = None, service_type: str = 'word2xhtml5'):
         """
         Gmail OAuth Monitor を初期化
         
         Args:
             credentials_path: OAuth2.0クライアント認証ファイルのパス
+            service_type: 'word2xhtml5' または 'review'
         """
         self.logger = get_logger(__name__)
         self.config = get_config()
+        self.service_type = service_type
+        self.email_processor = create_email_processor(service_type)
         
         # EXE環境対応
         from core.gmail_oauth_exe_helper import gmail_oauth_helper
@@ -115,9 +119,8 @@ class GmailOAuthMonitor:
             if from_address:
                 query_parts.append(f'from:{from_address}')
             else:
-                # デフォルトでRe:VIEW処理のメールアドレスを使用
-                # ※ エラーチェック用のメールは除外
-                query_parts.append('from:kanazawa@nextpublishing.jp')
+                # デフォルトの送信者は指定しない（呼び出し元で明示的に指定すべき）
+                pass
             
             if since_time:
                 # Gmail検索では秒単位の精度で時刻指定可能
@@ -129,10 +132,11 @@ class GmailOAuthMonitor:
                 self.logger.info(f"検索対象: {since_time.isoformat()}以降のメール")
                 self.logger.info(f"エポックタイムスタンプ: {epoch_timestamp} (現在: {current_timestamp})")
                 
-                # 5分前からの検索に変更（メール配送の遅延を考慮）
-                search_timestamp = epoch_timestamp - 300  # 5分前
-                query_parts.append(f'after:{search_timestamp}')
-                self.logger.info(f"実際の検索タイムスタンプ: {search_timestamp} (5分前から検索)")
+                # より正確な時刻フィルタリング
+                # Gmail APIのafter:はUNIXタイムスタンプまたは日付形式をサポート
+                # 秒単位の精度で検索するためにタイムスタンプを使用
+                query_parts.append(f'after:{epoch_timestamp}')
+                self.logger.info(f"実際の検索タイムスタンプ: {epoch_timestamp} ({since_time.strftime('%Y-%m-%d %H:%M:%S UTC')})")
             
             query = ' '.join(query_parts)
             self.logger.info(f"Gmail検索クエリ: {query}")
@@ -176,12 +180,14 @@ class GmailOAuthMonitor:
             self.logger.error(f"メッセージ取得エラー: {e}")
             return None
     
-    def extract_download_url_and_filename(self, message: Dict) -> Optional[Tuple[str, str]]:
+    def extract_download_url_and_filename(self, message: Dict, 
+                                         purpose: str = 'download') -> Optional[Tuple[str, str]]:
         """
         メッセージからダウンロードURLとファイル名を抽出
         
         Args:
             message: Gmail APIから取得したメッセージ
+            purpose: 'download' または 'error_check'
             
         Returns:
             (ダウンロードURL, ファイル名) または None
@@ -197,80 +203,81 @@ class GmailOAuthMonitor:
             self.logger.info(f"メール本文（先頭500文字）: {body_text[:500]}")
             self.logger.debug(f"メール本文全体の長さ: {len(body_text)}文字")
             
-            # まず、ZIPファイルのダウンロードURLを探す（do_download）
-            # ※ do_download_pdfは個別ファイル用なので除外
-            zip_url_patterns = [
-                # ZIPファイル用のダウンロードURL（do_download）を優先
-                r'http://trial\.nextpublishing\.jp/rapture/do_download\?n=[^\s\n\r]+',
-                r'http://trial\.nextpublishing\.jp/upload_46tate/do_download\?n=[^\s\n\r]+',
-                r'<(http://trial\.nextpublishing\.jp/[^/]+/do_download\?[^>]+)>',
-                # ReVIEW形式用のダウンロードURL
-                r'http://trial\.nextpublishing\.jp/upload_46tate/do_download_review\?n=[^\s\n\r]+',
-            ]
+            # EmailProcessorを使用してURLを抽出
+            urls = self.email_processor.extract_urls(body_text)
+            if not urls:
+                self.logger.warning("URLが見つかりませんでした")
+                return None
             
-            download_url = None
-            url_type = None
-            for pattern in zip_url_patterns:
-                url_match = re.search(pattern, body_text)
-                if url_match:
-                    download_url = url_match.group(1) if url_match.lastindex else url_match.group(0)
-                    if 'do_download_review' in download_url:
-                        url_type = "ReVIEW形式"
-                    else:
-                        url_type = "ZIP形式"
-                    self.logger.info(f"{url_type}ダウンロードURL抽出: {download_url[:80]}...")
-                    break
-                else:
-                    self.logger.debug(f"パターン {pattern} にマッチしませんでした")
-            
-            # ZIPファイルのURLが見つからない場合は、個別PDFのURLも探す（フォールバック）
+            # 目的に応じたURLを取得
+            download_url = self.email_processor.get_url_for_purpose(urls, purpose)
             if not download_url:
-                pdf_url_patterns = [
-                    r'http://trial\.nextpublishing\.jp/upload_46tate/do_download_pdf\?n=[^\s\n\r]+',
-                    r'<(http://trial\.nextpublishing\.jp/upload_46tate/do_download_pdf\?[^>]+)>',
-                ]
-                
-                for pattern in pdf_url_patterns:
-                    url_match = re.search(pattern, body_text)
-                    if url_match:
-                        download_url = url_match.group(1) if url_match.lastindex else url_match.group(0)
-                        self.logger.warning(f"ZIP URLが見つからないため、PDF URLを使用: {download_url[:80]}...")
-                        break
+                self.logger.warning(f"目的 '{purpose}' に適したURLが見つかりませんでした")
+                return None
             
             # ファイル名を抽出
-            filename_patterns = [
-                # ZIPファイル名のパターン
-                r'ファイル名：([^\n\r]+\.zip)',
-                r'([^\s]+\.zip)',
-                # 従来のdocxパターン（フォールバック）
-                r'ファイル名：([^\n\r]+\.docx)',
-                r'ファイル名：([^\n\r]+)',
-                r'ファイル：([^\n\r]+\.docx)',
-                r'([^\s]+\.docx)',
-                # 実際のメール形式に対応
-                r'超原稿用紙\s*\n\s*([^\n\r]+\.docx)',
-                r'アップロードしていただいた[^\n]*\n\s*([^\n\r]+\.docx)',
-            ]
+            filename = self.email_processor.extract_filename(body_text)
             
-            filename = None
-            for pattern in filename_patterns:
-                filename_match = re.search(pattern, body_text)
-                if filename_match:
-                    filename = filename_match.group(1).strip()
-                    self.logger.info(f"メール本文からファイル名を検出: {filename}")
-                    break
-            
-            if download_url and filename:
+            if filename:
                 return (download_url, filename)
-            elif download_url:
+            else:
                 # ファイル名が見つからない場合はデフォルト名を使用
                 self.logger.warning("ファイル名が見つかりませんでした。デフォルト名を使用します。")
-                return (download_url, "converted.zip")
-            
-            return None
+                default_name = "converted.zip" if purpose == 'download' else "converted.pdf"
+                return (download_url, default_name)
             
         except Exception as e:
             self.logger.error(f"URL/ファイル名抽出エラー: {e}")
+            return None
+    
+    def extract_pdf_url_from_message(self, message: Dict) -> Optional[str]:
+        """
+        メッセージからPDF URLのみを抽出（エラーファイル検知用）
+        
+        Args:
+            message: Gmail APIから取得したメッセージ
+            
+        Returns:
+            PDF URL または None
+        """
+        try:
+            # メール本文を取得
+            payload = message.get('payload', {})
+            body_text = self._extract_body_text(payload)
+            
+            if not body_text:
+                return None
+            
+            self.logger.info("エラーファイル検知用にPDF URLを抽出中...")
+            
+            # すべてのURLを抽出
+            all_urls = []
+            
+            # PDF URLパターン
+            pdf_url_patterns = [
+                r'http://trial\.nextpublishing\.jp/upload_46tate/do_download_pdf\?n=[^\s\n\r<>"]+',
+                r'http://trial\.nextpublishing\.jp/rapture/do_download_pdf\?n=[^\s\n\r<>"]+',
+            ]
+            
+            for pattern in pdf_url_patterns:
+                matches = re.findall(pattern, body_text)
+                if matches:
+                    all_urls.extend(matches)
+                    self.logger.info(f"PDF URLパターン {pattern} で {len(matches)} 件のURLを発見")
+            
+            if all_urls:
+                # 最後のPDF URLを返す（ユーザーの指示により）
+                self.logger.info(f"見つかったPDF URL数: {len(all_urls)}件")
+                self.logger.info(f"最後のPDF URLを使用: {all_urls[-1]}")
+                return all_urls[-1]
+            else:
+                self.logger.warning("PDF URLが見つかりませんでした")
+                # デバッグ用：メール本文の一部を表示
+                self.logger.debug(f"メール本文（最初の1000文字）: {body_text[:1000]}")
+                return None
+            
+        except Exception as e:
+            self.logger.error(f"PDF URL抽出エラー: {e}")
             return None
     
     def _extract_body_text(self, payload: Dict) -> str:
@@ -304,7 +311,8 @@ class GmailOAuthMonitor:
                       check_interval: int = 10,
                       return_with_filename: bool = False,
                       since_time: Optional[datetime] = None,
-                      from_address: Optional[str] = None) -> Optional[Tuple[str, str]]:
+                      from_address: Optional[str] = None,
+                      purpose: str = 'download') -> Optional[Tuple[str, str]]:
         """
         特定の件名のメールを待機してダウンロードURLを取得
         
@@ -314,6 +322,7 @@ class GmailOAuthMonitor:
             timeout: タイムアウト時間（秒）
             check_interval: チェック間隔（秒）
             from_address: 送信元メールアドレス（フィルタリング用）
+            purpose: 'download' または 'error_check' - 用途に応じたURLを抽出
         
         Returns:
             (ダウンロードURL, ファイル名) または None
@@ -341,10 +350,12 @@ class GmailOAuthMonitor:
                 )
                 
                 # 新しいメッセージをチェック
-                for message in messages:
+                for idx, message in enumerate(messages):
                     message_id = message['id']
+                    self.logger.info(f"メール {idx+1}/{len(messages)} を処理中: ID={message_id}")
                     
                     if message_id in processed_message_ids:
+                        self.logger.info(f"既に処理済みのメール: {message_id}")
                         continue
                     
                     # メッセージの詳細を取得
@@ -353,12 +364,36 @@ class GmailOAuthMonitor:
                         self.logger.warning(f"メッセージ詳細を取得できませんでした: {message_id}")
                         continue
                     
-                    # URLとファイル名を抽出
-                    result = self.extract_download_url_and_filename(message_details)
+                    # メールの受信時刻を確認（since_timeが指定されている場合）
+                    if since_time:
+                        internal_date = message_details.get('internalDate')
+                        if internal_date:
+                            # internalDateはミリ秒単位のUNIXタイムスタンプ
+                            email_timestamp = int(internal_date) / 1000
+                            email_datetime = datetime.fromtimestamp(email_timestamp, tz=timezone.utc)
+                            
+                            # 時刻比較のログ
+                            from zoneinfo import ZoneInfo
+                            jst = ZoneInfo('Asia/Tokyo')
+                            email_jst = email_datetime.astimezone(jst)
+                            since_jst = since_time.astimezone(jst)
+                            
+                            self.logger.info(f"メール受信時刻(UTC): {email_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
+                            self.logger.info(f"メール受信時刻(JST): {email_jst.strftime('%Y-%m-%d %H:%M:%S')}")
+                            self.logger.info(f"検索基準時刻(JST): {since_jst.strftime('%Y-%m-%d %H:%M:%S')}")
+                            
+                            # since_timeより前のメールはスキップ
+                            if email_datetime < since_time:
+                                time_diff = (since_time - email_datetime).total_seconds()
+                                self.logger.info(f"古いメールをスキップ: {int(time_diff)}秒前のメール")
+                                processed_message_ids.add(message_id)
+                                continue
+                    
+                    # URLとファイル名を抽出（purposeパラメータを渡す）
+                    result = self.extract_download_url_and_filename(message_details, purpose=purpose)
                     if result:
                         url, filename = result
-                        self.logger.info(f"メール検出: {filename} -> {url}")
-                        # return_with_filenameに関係なく常にタプルで返す（IMAP互換）
+                        self.logger.info(f"メール検出（{purpose}）: {filename} -> {url}")
                         if return_with_filename:
                             return result
                         else:

@@ -1,7 +1,7 @@
-﻿"""入力パネルモジュール"""
+"""入力パネルモジュール"""
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QTextEdit, QPushButton, QGroupBox)
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QFont
 
 from utils.validators import Validators
@@ -13,6 +13,8 @@ class InputPanel(QWidget):
     # カスタムシグナル
     process_requested = pyqtSignal(list)  # Nコードのリストを送信
     settings_requested = pyqtSignal()  # 設定ボタンクリック
+    pdf_post_requested = pyqtSignal(str)  # PDF投稿リクエスト（N番号）
+    error_check_requested = pyqtSignal(list)  # エラーファイル検知リクエスト（Nコードリスト）
     
     def __init__(self, parent=None):
         """
@@ -142,10 +144,63 @@ class InputPanel(QWidget):
             }
         """)
         
+        # PDF投稿ボタン
+        self.pdf_post_button = QPushButton("PDF投稿")
+        self.pdf_post_button.clicked.connect(self.on_pdf_post_clicked)
+        self.pdf_post_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FF9800;
+                color: white;
+                font-weight: bold;
+                padding: 8px 20px;
+                border: none;
+                border-radius: 4px;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+            QPushButton:pressed {
+                background-color: #E65100;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+        
+        # エラーファイル検知ボタン
+        self.error_check_button = QPushButton("エラーファイル検知")
+        self.error_check_button.clicked.connect(self.on_error_check_clicked)
+        self.error_check_button.setToolTip("組版エラー後の原因ファイルを特定します")
+        self.error_check_button.setStyleSheet("""
+            QPushButton {
+                background-color: #E91E63;
+                color: white;
+                font-weight: bold;
+                padding: 8px 20px;
+                border: none;
+                border-radius: 4px;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #C2185B;
+            }
+            QPushButton:pressed {
+                background-color: #AD1457;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+                color: #666666;
+            }
+        """)
+        
         # ボタンを配置
         button_layout.addWidget(self.process_button)
         button_layout.addWidget(self.clear_button)
         button_layout.addWidget(self.settings_button)
+        button_layout.addWidget(self.error_check_button)
+        button_layout.addWidget(self.pdf_post_button)
         button_layout.addStretch()
         
         # グループレイアウトに追加
@@ -207,6 +262,41 @@ class InputPanel(QWidget):
         """設定ボタンがクリックされた時の処理"""
         self.settings_requested.emit()
     
+    def on_pdf_post_clicked(self):
+        """PDF投稿ボタンがクリックされた時の処理"""
+        text = self.n_code_input.toPlainText().strip()
+        
+        if not text:
+            self.show_error("N番号を入力してください。")
+            return
+        
+        # 1つのN番号のみ受け付ける
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        n_codes = []
+        for line in lines:
+            # カンマ、タブ、スペースで分割
+            codes = [code.strip() for code in line.replace(',', ' ').replace('\t', ' ').split() if code.strip()]
+            n_codes.extend(codes)
+        
+        if len(n_codes) != 1:
+            self.show_error("PDF投稿は1つのN番号のみ指定してください。")
+            return
+        
+        n_code = n_codes[0]
+        # 簡易バリデーション
+        if not n_code.upper().startswith('N') or len(n_code) < 5:
+            self.show_error("正しいN番号を入力してください（例: N01234）。")
+            return
+        
+        self.pdf_post_requested.emit(n_code)
+    
+    @pyqtSlot()
+    def on_error_check_clicked(self):
+        """エラーファイル検知ボタンクリック時の処理"""
+        if self.validate_input():
+            n_codes = self.get_n_codes()
+            self.error_check_requested.emit(n_codes)
+    
     def show_error(self, message: str):
         """エラーメッセージを表示"""
         from PyQt6.QtWidgets import QMessageBox
@@ -216,4 +306,6 @@ class InputPanel(QWidget):
         """パネルの有効/無効を設定"""
         self.process_button.setEnabled(enabled)
         self.clear_button.setEnabled(enabled)
+        self.error_check_button.setEnabled(enabled)
+        self.pdf_post_button.setEnabled(enabled)
         self.n_code_input.setEnabled(enabled)

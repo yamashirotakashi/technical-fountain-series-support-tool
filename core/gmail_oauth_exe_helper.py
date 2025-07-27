@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from utils.logger import get_logger
+from utils.path_resolver import PathResolver
 
 
 class GmailOAuthExeHelper:
@@ -14,7 +15,7 @@ class GmailOAuthExeHelper:
     
     def __init__(self):
         self.logger = get_logger(__name__)
-        self.is_exe = getattr(sys, 'frozen', False)
+        self.is_exe = PathResolver.is_exe_environment()
         
     def get_credentials_path(self) -> Tuple[str, str]:
         """
@@ -23,31 +24,34 @@ class GmailOAuthExeHelper:
         Returns:
             (credentials_path, token_path) のタプル
         """
-        if self.is_exe:
-            # EXE環境: 実行ファイルと同じディレクトリまたはユーザーディレクトリ
-            exe_dir = Path(sys.executable).parent
-            user_config_dir = Path.home() / '.techzip' / 'config'
-            
-            # ユーザーディレクトリを優先（書き込み可能）
-            if not user_config_dir.exists():
-                user_config_dir.mkdir(parents=True, exist_ok=True)
-                self.logger.info(f"ユーザー設定ディレクトリを作成: {user_config_dir}")
-            
-            credentials_path = user_config_dir / 'gmail_oauth_credentials.json'
-            token_path = user_config_dir / 'gmail_token.pickle'
-            
-            # EXEディレクトリから初期ファイルをコピー（存在する場合）
-            exe_creds = exe_dir / 'config' / 'gmail_oauth_credentials.json'
-            if exe_creds.exists() and not credentials_path.exists():
-                import shutil
-                shutil.copy2(exe_creds, credentials_path)
-                self.logger.info(f"認証ファイルをユーザーディレクトリにコピー: {credentials_path}")
-            
+        # PathResolverを使用して適切なパスを取得
+        config_path = PathResolver.get_config_path(prefer_user_dir=True)
+        
+        # 認証ファイルのパス
+        credentials_filename = 'gmail_oauth_credentials.json'
+        token_filename = 'gmail_token.pickle'
+        
+        # 既存のファイルを探す
+        credentials_path = PathResolver.resolve_config_file(credentials_filename)
+        
+        if credentials_path:
+            # 認証ファイルが見つかった場合、同じディレクトリにトークンファイルを配置
+            token_path = credentials_path.parent / token_filename
         else:
-            # 開発環境: プロジェクトのconfigディレクトリ
-            config_dir = Path(__file__).parent.parent / 'config'
-            credentials_path = config_dir / 'gmail_oauth_credentials.json'
-            token_path = config_dir / 'gmail_token.pickle'
+            # 見つからない場合は、適切な場所に新規作成
+            credentials_path = config_path / credentials_filename
+            token_path = config_path / token_filename
+            
+            # EXE環境で初期ファイルをコピー
+            if self.is_exe:
+                exe_creds = PathResolver.get_base_path() / 'config' / credentials_filename
+                if exe_creds.exists() and not credentials_path.exists():
+                    import shutil
+                    try:
+                        shutil.copy2(exe_creds, credentials_path)
+                        self.logger.info(f"認証ファイルをユーザーディレクトリにコピー: {credentials_path}")
+                    except Exception as e:
+                        self.logger.warning(f"認証ファイルのコピーに失敗: {e}")
         
         return str(credentials_path), str(token_path)
     
@@ -158,31 +162,29 @@ https://developers.google.com/gmail/api/quickstart/python
     
     def save_config_template(self):
         """設定ファイルのテンプレートを保存（初回実行時）"""
-        if self.is_exe:
-            config_dir = Path.home() / '.techzip' / 'config'
-            config_path = config_dir / 'settings.json'
-            
-            if not config_path.exists():
-                config_dir.mkdir(parents=True, exist_ok=True)
-                
-                template = {
-                    "google_sheet": {
-                        "sheet_id": "YOUR_SHEET_ID_HERE",
-                        "credentials_path": "YOUR_GOOGLE_SERVICE_ACCOUNT_JSON_PATH"
-                    },
-                    "paths": {
-                        "git_base": "G:\\マイドライブ\\[git]",
-                        "output_base": "G:\\.shortcut-targets-by-id\\YOUR_FOLDER_ID\\NP-IRD"
-                    },
-                    "email": {
-                        "gmail_credentials_path": str(config_dir / "gmail_oauth_credentials.json")
-                    }
+        config_path = PathResolver.get_config_path() / 'settings.json'
+        
+        if not config_path.exists():
+            template = {
+                "google_sheet": {
+                    "sheet_id": "YOUR_SHEET_ID_HERE",
+                    "credentials_path": "YOUR_GOOGLE_SERVICE_ACCOUNT_JSON_PATH"
+                },
+                "paths": {
+                    "git_base": "G:\\マイドライブ\\[git]",
+                    "output_base": "G:\\.shortcut-targets-by-id\\YOUR_FOLDER_ID\\NP-IRD"
+                },
+                "email": {
+                    "gmail_credentials_path": str(PathResolver.get_config_path() / "gmail_oauth_credentials.json")
                 }
-                
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    json.dump(template, f, indent=4, ensure_ascii=False)
-                
-                self.logger.info(f"設定ファイルテンプレートを作成: {config_path}")
+            }
+            
+            PathResolver.ensure_file_exists(
+                config_path,
+                json.dumps(template, indent=4, ensure_ascii=False)
+            )
+            
+            self.logger.info(f"設定ファイルテンプレートを作成: {config_path}")
 
 
 # グローバルインスタンス

@@ -11,7 +11,8 @@ sys.path.insert(0, str(project_root))
 from dotenv import load_dotenv
 load_dotenv()
 
-# PyQt5縺ｮ險ｭ螳・os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
+# PyQt6の設定
+os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'
 
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import Qt

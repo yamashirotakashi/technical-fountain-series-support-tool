@@ -92,8 +92,17 @@ class WorkflowProcessor(QObject):
                 # Gmail API使用
                 self.logger.info("Gmail APIを使用してメール監視を初期化します")
                 from core.gmail_oauth_monitor import GmailOAuthMonitor
-                credentials_path = self.config.get('email', {}).get('gmail_credentials_path', 'config/gmail_oauth_credentials.json')
-                self._email_monitor = GmailOAuthMonitor(credentials_path)
+                from core.gmail_oauth_exe_helper import gmail_oauth_helper
+                
+                # EXE環境とそれ以外で分岐
+                if gmail_oauth_helper.is_exe:
+                    # EXE環境では内部でパス解決させる
+                    self._email_monitor = GmailOAuthMonitor(credentials_path=None)
+                else:
+                    # 開発環境では設定から取得
+                    credentials_path = self.config.get('email', {}).get('gmail_credentials_path', 'config/gmail_oauth_credentials.json')
+                    self._email_monitor = GmailOAuthMonitor(credentials_path)
+                
                 self._email_monitor.authenticate()
             else:
                 # 従来のIMAP使用（パスワードが必要）
@@ -307,11 +316,16 @@ class WorkflowProcessor(QObject):
                         )
                     except TypeError:
                         # パラメータがサポートされていない場合（従来のIMAPの場合）
+                        from utils.constants import EMAIL_SENDERS, EMAIL_SUBJECTS
                         download_url = self.email_monitor.wait_for_email(
-                            subject_pattern="Re:VIEW to 超原稿用紙"
+                            subject_pattern=EMAIL_SUBJECTS['REVIEW_CONVERSION'],
+                            from_address=EMAIL_SENDERS['REVIEW_CONVERSION']
                         )
                 else:
-                    download_url = self.email_monitor.wait_for_email()
+                    from utils.constants import EMAIL_SENDERS
+                    download_url = self.email_monitor.wait_for_email(
+                        from_address=EMAIL_SENDERS['REVIEW_CONVERSION']
+                    )
                 
                 if not download_url:
                     raise ValueError("タイムアウト: メールが届きませんでした")

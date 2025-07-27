@@ -8,7 +8,8 @@ from PyQt6.QtCore import pyqtSignal
 
 from core.workflow_processor import WorkflowProcessor
 from services.nextpublishing_service import NextPublishingService
-from core.email_monitor import EmailMonitor
+from services.error_check_validator import ErrorCheckValidator
+from core.email_monitor_enhanced import EmailMonitorEnhanced
 from utils.logger import get_logger
 
 
@@ -140,10 +141,17 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
         
         # 3. 作業フォルダを自動検出
         self.emit_log("作業フォルダを自動検出中...", "INFO")
-        work_folder = self.file_manager.find_work_folder_interactive(repo_path, repo_name)
+        # エラーチェック時は自動検出のみ（ダイアログを表示しない）
+        work_folder = self.file_manager.find_work_folder(repo_path)
         
         if not work_folder:
-            raise ValueError("作業フォルダが見つかりませんでした")
+            # articlesフォルダがある場合はそれを使用
+            articles_folder = repo_path / "articles"
+            if articles_folder.exists() and articles_folder.is_dir():
+                self.emit_log(f"articlesフォルダを作業フォルダとして使用: {articles_folder}", "INFO")
+                work_folder = articles_folder
+            else:
+                raise ValueError("作業フォルダが見つかりませんでした")
         
         self.emit_log(f"作業フォルダ: {work_folder}", "INFO")
         
@@ -152,6 +160,7 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
         zip_path = self.file_manager.create_zip(work_folder)
         
         # 5. 処理方式に応じて分岐
+        self.logger.info(f"現在の処理モード: {self.process_mode}")
         if self.process_mode == "api":
             # API方式の処理
             self.emit_log("API方式で変換処理を開始...", "INFO")
@@ -233,18 +242,59 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
             if not self.nextpublishing_service:
                 self.nextpublishing_service = NextPublishingService()
             
-            # メール監視を初期化
+            # メール監視を初期化（Gmail API優先）
             email_monitor = None
             if self.email_password:
+                # まずGmail APIを試行
                 try:
-                    email_monitor = EmailMonitor(
-                        email_address=self.email_address,
-                        password=self.email_password
-                    )
-                    email_monitor.connect()
-                    self.emit_log("メール監視を有効化しました", "INFO")
+                    from core.gmail_oauth_monitor import GmailOAuthMonitor
+                    from core.gmail_oauth_exe_helper import gmail_oauth_helper
+                    
+                    # 開発環境とEXE環境の両方に対応
+                    if gmail_oauth_helper.is_exe:
+                        # EXE環境: exe_helperを使用
+                        self.emit_log("EXE環境でGmail API認証をチェック中...", "DEBUG")
+                        credentials_path, token_path = gmail_oauth_helper.get_credentials_path()
+                        self.emit_log(f"認証ファイルパス: {credentials_path}", "DEBUG")
+                        
+                        if gmail_oauth_helper.check_credentials_exist():
+                            self.emit_log("Gmail APIを使用してメール監視を初期化します（EXE環境）", "INFO")
+                            # EXE環境では明示的にNoneを渡して内部でパス解決させる
+                            email_monitor = GmailOAuthMonitor(credentials_path=None, service_type='word2xhtml5')
+                            email_monitor.authenticate()
+                            self.emit_log("Gmail APIメール監視を有効化しました", "INFO")
+                        else:
+                            raise FileNotFoundError(f"OAuth2.0認証ファイルが見つかりません: {credentials_path}")
+                    else:
+                        # 開発環境: 従来のパスを使用
+                        gmail_credentials_path = Path("config/gmail_oauth_credentials.json")
+                        if not gmail_credentials_path.exists():
+                            alt_path = Path("config/gmail_credentials.json")
+                            if alt_path.exists():
+                                gmail_credentials_path = alt_path
+                        
+                        if gmail_credentials_path.exists():
+                            self.emit_log("Gmail APIを使用してメール監視を初期化します（開発環境）", "INFO")
+                            email_monitor = GmailOAuthMonitor(str(gmail_credentials_path), service_type='word2xhtml5')
+                            email_monitor.authenticate()
+                            self.emit_log("Gmail APIメール監視を有効化しました", "INFO")
+                        else:
+                            raise FileNotFoundError("OAuth2.0認証ファイルが見つかりません: config/gmail_oauth_credentials.json")
                 except Exception as e:
-                    self.emit_log(f"メール監視の初期化に失敗: {e}", "WARNING")
+                    # Gmail APIが使えない場合はIMAPにフォールバック
+                    import traceback
+                    self.emit_log(f"Gmail API初期化失敗、IMAPを使用します: {e}", "WARNING")
+                    self.emit_log(f"詳細エラー: {traceback.format_exc()}", "DEBUG")
+                    try:
+                        email_monitor = EmailMonitorEnhanced(
+                            email_address=self.email_address,
+                            password=self.email_password,
+                            service_type='word2xhtml5'  # Word2XHTML5用の処理
+                        )
+                        email_monitor.connect()
+                        self.emit_log("IMAPメール監視を有効化しました", "INFO")
+                    except Exception as e2:
+                        self.emit_log(f"メール監視の初期化に失敗: {e2}", "WARNING")
             
             error_files = []
             total_files = len(word_files)
@@ -259,21 +309,14 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
                 self.emit_status(f"Word2XHTML5検証中: バッチ {batch_num}")
                 self.emit_log(f"バッチ {batch_num} をアップロード中...", "INFO")
                 
-                # アップロード前にメール監視開始時刻を記録（Gmail API優先）
+                # アップロード前にメール監視開始時刻を記録
+                upload_start_time = datetime.now(timezone.utc)
                 if email_monitor:
-                    # Gmail API監視を試行
-                    try:
-                        from core.gmail_oauth_monitor import GmailOAuthMonitor
-                        gmail_monitor = GmailOAuthMonitor("config/gmail_oauth_credentials.json")
-                        gmail_monitor.authenticate()
-                        email_monitor = gmail_monitor  # Gmail APIに切り替え
-                        self.emit_log("Gmail API監視を有効化しました", "INFO")
-                    except Exception as e:
-                        self.emit_log(f"Gmail API使用不可、IMAPにフォールバック: {e}", "WARNING")
-                        email_monitor.reset_processed_emails()  # IMAPの場合のみリセット
-                    
-                    upload_start_time = datetime.now(timezone.utc)
-                    self.emit_log(f"アップロード開始時刻: {upload_start_time.isoformat()}", "DEBUG")
+                    # 日本時間でも表示
+                    from zoneinfo import ZoneInfo
+                    jst_time = upload_start_time.astimezone(ZoneInfo('Asia/Tokyo'))
+                    self.emit_log(f"アップロード開始時刻(UTC): {upload_start_time.strftime('%Y-%m-%d %H:%M:%S')} UTC", "INFO")
+                    self.emit_log(f"アップロード開始時刻(JST): {jst_time.strftime('%Y-%m-%d %H:%M:%S')} JST", "INFO")
                 
                 # バッチアップロード
                 results = self.nextpublishing_service.upload_multiple_files(batch, batch_size)
@@ -295,33 +338,32 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
                     # バッチ内のすべてのファイルのメールを収集（アップロード時刻を渡す）
                     file_url_map = self._collect_batch_emails(upload_success_files, email_monitor, upload_start_time)
                     
-                    # 各ファイルのPDFチェック
-                    for j, file_path in enumerate(upload_success_files):
-                        current_file_index = i + j
-                        progress = 50 + int((current_file_index / total_files) * 50)  # 後半50%
-                        self.emit_progress(progress)
-                        
-                        # ファイル名に対応するURLを取得
-                        pdf_url = file_url_map.get(file_path.name)
-                        
-                        if pdf_url:
-                            self.emit_log(f"  URLチェック中: {file_path.name}", "DEBUG")
-                            self.emit_log(f"    URL: {pdf_url}", "DEBUG")
-                            
-                            # PDFダウンロード可否をチェック
-                            is_downloadable, message = self.nextpublishing_service.check_pdf_downloadable(pdf_url)
-                            
-                            self.emit_log(f"    結果: {message}", "DEBUG")
-                            
-                            if not is_downloadable:
-                                error_files.append(file_path)
-                                self.emit_log(f"  ✗ PDFエラー: {file_path.name} - {message}", "ERROR")
-                            else:
-                                self.emit_log(f"  ✓ PDF正常: {file_path.name}", "INFO")
-                        else:
-                            # メールが見つからない = エラー扱い
+                    # ErrorCheckValidatorを使用してバッチ検証
+                    validator = ErrorCheckValidator()
+                    
+                    # ファイル名とパスのマッピングを作成
+                    filename_to_path = {f.name: f for f in upload_success_files}
+                    
+                    # バッチ検証を実行
+                    error_results, normal_results = validator.validate_batch(file_url_map)
+                    
+                    # エラーファイルを記録
+                    for error_result in error_results:
+                        filename = error_result['filename']
+                        reason = error_result['reason']
+                        if filename in filename_to_path:
+                            file_path = filename_to_path[filename]
                             error_files.append(file_path)
-                            self.emit_log(f"  ✗ メール未検出: {file_path.name}", "ERROR")
+                            self.emit_log(f"  ✗ PDFエラー: {filename} - {reason}", "ERROR")
+                    
+                    # 正常ファイルも記録
+                    for normal_result in normal_results:
+                        filename = normal_result['filename']
+                        self.emit_log(f"  ✓ 正常: {filename}", "INFO")
+                    
+                    # 進捗更新
+                    progress = 50 + int((i + len(upload_success_files)) / total_files * 50)
+                    self.emit_progress(progress)
                 else:
                     # メール監視なしの場合
                     self.emit_log("メール監視が無効です。手動確認が必要です", "WARNING")
@@ -376,7 +418,7 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
         self.selected_files_for_error_detection = selected_files
         self.emit_log(f"エラー検知ファイル選択結果: {len(selected_files)}個のファイルを選択", "INFO")
     
-    def _collect_batch_emails(self, files: List[Path], email_monitor: EmailMonitor, 
+    def _collect_batch_emails(self, files: List[Path], email_monitor: EmailMonitorEnhanced, 
                             upload_start_time: datetime = None) -> Dict[str, str]:
         """
         バッチ内のすべてのファイルに対応するメールを収集
@@ -401,16 +443,24 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
         
         self.emit_log(f"バッチ内の{len(files)}個のファイルのメールを収集中...", "INFO")
         self.emit_log(f"対象ファイル: {', '.join(uploaded_filenames)}", "DEBUG")
+        # 日本時間に変換して表示
+        from zoneinfo import ZoneInfo
+        jst_time = upload_start_time.astimezone(ZoneInfo('Asia/Tokyo'))
+        self.emit_log(f"アップロード時刻: {upload_start_time.strftime('%Y-%m-%d %H:%M:%S')} UTC", "INFO")
+        self.emit_log(f"アップロード時刻(JST): {jst_time.strftime('%Y-%m-%d %H:%M:%S')} JST", "INFO")
+        self.emit_log(f"メール検索開始時刻: {upload_start_time.strftime('%Y-%m-%d %H:%M:%S')} UTC (アップロード時刻以降)", "INFO")
         
         # すべてのファイルのメールが見つかるまで待機
         while collected_count < len(files) and (datetime.now() - start_time).seconds < timeout:
-            # 新しいメールをチェック
+            # 新しいメールをチェック（エラーファイル検知用）
+            # アップロード時刻以降のメールのみを取得
             result = email_monitor.wait_for_email(
                 subject_pattern="ダウンロード用URLのご案内",
                 timeout=check_interval,
                 check_interval=5,
                 return_with_filename=True,
-                since_time=upload_start_time
+                since_time=upload_start_time,
+                purpose='error_check'  # PDF URLを取得
             )
             
             if result:
@@ -419,9 +469,14 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
                     # アップロードしたファイルのメールかチェック
                     if filename and filename in uploaded_filenames:
                         if filename not in file_url_map:
+                            # purpose='error_check'を指定しているので、PDF URLが返される
                             file_url_map[filename] = url
                             collected_count += 1
+                            # メール時刻情報も表示（デバッグ用）
                             self.emit_log(f"  ✓ メール検出: {filename} ({collected_count}/{len(files)})", "INFO")
+                            # アップロードとメール検出の時間差を計算
+                            time_diff = (datetime.now(timezone.utc) - upload_start_time).total_seconds()
+                            self.emit_log(f"     アップロードからの経過時間: {int(time_diff)}秒", "DEBUG")
                         else:
                             self.emit_log(f"  - 既に検出済み: {filename}", "DEBUG")
                     elif filename:

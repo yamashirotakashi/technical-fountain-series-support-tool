@@ -98,7 +98,18 @@ class WordProcessor:
         if not folder_path.exists():
             return []
         
-        return list(folder_path.glob("**/*.docx"))
+        # すべてのファイルを列挙（デバッグ用）
+        all_files = list(folder_path.rglob("*"))
+        self.logger.info(f"フォルダ内の全ファイル数: {len(all_files)}")
+        for file_path in all_files:
+            if file_path.is_file():
+                self.logger.debug(f"  - {file_path.relative_to(folder_path)}")
+        
+        # .docxファイルを検索
+        word_files = list(folder_path.glob("**/*.docx"))
+        self.logger.info(f"見つかったWordファイル数: {len(word_files)}")
+        
+        return word_files
     
     def process_zip_file(self, zip_path: Path, temp_dir: Optional[Path] = None) -> List[Path]:
         """
@@ -128,6 +139,12 @@ class WordProcessor:
         try:
             # ZIPファイルを展開
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                # ZIP内のファイル一覧をログ出力
+                file_list = zip_ref.namelist()
+                self.logger.info(f"ZIP内のファイル数: {len(file_list)}")
+                for file_name in file_list:
+                    self.logger.info(f"  - {file_name}")
+                
                 zip_ref.extractall(temp_dir)
             
             self.logger.info(f"ZIP展開完了: {temp_dir}")

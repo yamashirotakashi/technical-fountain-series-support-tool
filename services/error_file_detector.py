@@ -216,9 +216,11 @@ class ErrorFileDetectorWorker(QThread):
                 return False
             
             # メールを待機してURLを取得
+            from utils.constants import EMAIL_SENDERS, EMAIL_SUBJECTS, EMAIL_TIMEOUTS
             pdf_url = email_monitor.wait_for_email(
-                subject_pattern="ダウンロード用URLのご案内",
-                timeout=1200,  # 20分
+                subject_pattern=EMAIL_SUBJECTS['WORD2XHTML5'],
+                from_address=EMAIL_SENDERS['WORD2XHTML5'],
+                timeout=EMAIL_TIMEOUTS['WORD2XHTML5'],
                 check_interval=30,
                 file_stem=file_path.stem
             )

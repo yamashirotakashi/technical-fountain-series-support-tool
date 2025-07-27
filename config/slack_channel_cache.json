@@ -1,0 +1,24 @@
+{
+  "channels": {
+    "n-\u30cd\u30c8\u30b3\u30f3\u4f5c\u54c1\u691c\u8a0e": {
+      "id": "C08MNSZ9RSN",
+      "name": "n-\u30cd\u30c8\u30b3\u30f3\u4f5c\u54c1\u691c\u8a0e",
+      "is_private": true,
+      "last_checked": "2025-07-27T13:48:10.436784"
+    },
+    "----0-tb18\u901a\u77e5": {
+      "id": "C08UNGMQW4W",
+      "name": "----0-tb18\u901a\u77e5",
+      "is_private": true,
+      "last_checked": "2025-07-27T13:48:10.436794"
+    },
+    "z-cursor\u9023\u643a": {
+      "id": "C0930DWQC80",
+      "name": "z-cursor\u9023\u643a",
+      "is_private": true,
+      "last_checked": "2025-07-27T13:48:10.436796"
+    }
+  },
+  "last_updated": "2025-07-27T13:48:10.436798",
+  "z1798-nuxt3-tailwindcss": "C047K3KRKM4"
+}

@@ -3,28 +3,32 @@ import imaplib
 import email
 import re
 import time
-from typing import Optional, Set
+from typing import Optional, Set, Union, Tuple
 from datetime import datetime, timedelta
 
 from utils.logger import get_logger
 from utils.config import get_config
+from core.email_processors import EmailProcessor, create_email_processor
 
 
 class EmailMonitorEnhanced:
     """メールを監視してダウンロードURLを取得するクラス（改良版）"""
     
-    def __init__(self, email_address: str, password: str):
+    def __init__(self, email_address: str, password: str, service_type: str = 'word2xhtml5'):
         """
         EmailMonitorを初期化
         
         Args:
             email_address: メールアドレス
             password: パスワード（アプリパスワード）
+            service_type: 'word2xhtml5' または 'review'
         """
         self.logger = get_logger(__name__)
         self.config = get_config()
         self.email_address = email_address
         self.password = password
+        self.service_type = service_type
+        self.email_processor = create_email_processor(service_type)
         
         # IMAP設定を取得
         email_config = self.config.get_email_config()
@@ -70,7 +74,10 @@ class EmailMonitorEnhanced:
     def wait_for_email(self, subject_pattern: str = "ダウンロード用URLのご案内", 
                       timeout: int = 1200, check_interval: int = 30,
                       file_stem: Optional[str] = None,
-                      sender_pattern: str = "support-np@impress.co.jp") -> Optional[str]:
+                      sender_pattern: str = "support-np@impress.co.jp",
+                      purpose: str = 'download',
+                      return_with_filename: bool = False,
+                      since_time: Optional[datetime] = None) -> Optional[Union[str, Tuple[str, str]]]:
         """
         特定の件名のメールを待機してダウンロードURLを取得
         
@@ -79,9 +86,13 @@ class EmailMonitorEnhanced:
             timeout: タイムアウト時間（秒）
             check_interval: チェック間隔（秒）
             file_stem: 対象ファイル名（拡張子なし）
+            sender_pattern: 送信元メールアドレスパターン
+            purpose: 'download' または 'error_check'
+            return_with_filename: Trueの場合、(URL, ファイル名)のタプルを返す
+            since_time: この時刻以降のメールのみ検索
         
         Returns:
-            ダウンロードURL（見つからない場合はNone）
+            ダウンロードURL、またはreturn_with_filenameがTrueの場合は(URL, ファイル名)のタプル
         """
         if not self.connection:
             self.connect()
@@ -158,12 +169,44 @@ class EmailMonitorEnhanced:
                                 except Exception as debug_error:
                                     self.logger.warning(f"デバッグ情報取得エラー: {debug_error}")
                                 
-                                # メール日時を確認（ログ出力のみ）
+                                # メール日時を確認
                                 email_date = self._get_email_date(msg)
                                 if email_date:
                                     self.logger.info(f"メール日時: {email_date}")
+                                    # より詳細な時刻情報を出力
+                                    if since_time:
+                                        # タイムゾーン情報を追加
+                                        from zoneinfo import ZoneInfo
+                                        jst = ZoneInfo('Asia/Tokyo')
+                                        
+                                        # since_timeのJST変換
+                                        since_jst = since_time.astimezone(jst) if since_time.tzinfo else since_time.replace(tzinfo=timezone.utc).astimezone(jst)
+                                        # email_dateのJST変換
+                                        email_jst = email_date.astimezone(jst) if email_date.tzinfo else email_date.replace(tzinfo=timezone.utc).astimezone(jst)
+                                        
+                                        self.logger.info(f"  検索基準時刻(UTC): {since_time}")
+                                        self.logger.info(f"  検索基準時刻(JST): {since_jst.strftime('%Y-%m-%d %H:%M:%S JST')}")
+                                        self.logger.info(f"  メール時刻(UTC): {email_date}")
+                                        self.logger.info(f"  メール時刻(JST): {email_jst.strftime('%Y-%m-%d %H:%M:%S JST')}")
+                                        time_diff = (email_date - since_time).total_seconds()
+                                        self.logger.info(f"  時刻差: {int(time_diff)}秒 {'(OK - 新しいメール)' if time_diff >= 0 else '(NG - 古いメール)'}")
                                 
-                                # 日付によるフィルタリングは無効化（コメントアウト）
+                                # since_timeが指定されている場合の時刻チェック
+                                if since_time and email_date:
+                                    # 両方の日時をUTCに変換して比較
+                                    from datetime import timezone
+                                    # email_dateがnaiveの場合はUTCとして扱う
+                                    if email_date.tzinfo is None:
+                                        email_date = email_date.replace(tzinfo=timezone.utc)
+                                    # since_timeがnaiveの場合もUTCとして扱う
+                                    if since_time.tzinfo is None:
+                                        since_time = since_time.replace(tzinfo=timezone.utc)
+                                    
+                                    if email_date < since_time:
+                                        # 指定時刻より前のメールはスキップ
+                                        self.logger.debug(f"メール時刻が検索範囲外: {email_date} < {since_time}")
+                                        self.processed_email_ids.add(email_id)
+                                        continue
                                 # if email_date and self.monitoring_start_time:
                                 #     # 両方の日時をUTCに変換して比較
                                 #     from datetime import timezone
@@ -212,11 +255,24 @@ class EmailMonitorEnhanced:
                                             
                                             # URLを抽出
                                             self.logger.info("URL抽出処理を開始します...")
-                                            download_url = self._extract_download_url(msg)
+                                            download_url = self._extract_download_url(msg, purpose=purpose)
                                             if download_url:
                                                 self.logger.info(f"ダウンロードURLを取得: {download_url}")
                                                 self.processed_email_ids.add(email_id)
-                                                return download_url
+                                                
+                                                # return_with_filenameが指定されている場合
+                                                if return_with_filename:
+                                                    # メール本文からファイル名を抽出
+                                                    body = self._get_email_body(msg)
+                                                    filename = self.email_processor.extract_filename(body)
+                                                    if filename:
+                                                        self.logger.info(f"ファイル名: {filename}")
+                                                        return (download_url, filename)
+                                                    else:
+                                                        self.logger.warning("ファイル名を抽出できませんでした")
+                                                        return (download_url, "unknown.docx")
+                                                else:
+                                                    return download_url
                                             else:
                                                 self.logger.warning(f"メールからURLを抽出できませんでした")
                                                 # デバッグ用：メール本文の一部を表示
@@ -254,9 +310,12 @@ class EmailMonitorEnhanced:
         try:
             date_str = msg.get('Date', '')
             if date_str:
+                self.logger.debug(f"メールのDateヘッダー: {date_str}")
                 # email.utils.parsedate_to_datetimeを使用
                 from email.utils import parsedate_to_datetime
-                return parsedate_to_datetime(date_str)
+                parsed_date = parsedate_to_datetime(date_str)
+                self.logger.debug(f"パース後の日時: {parsed_date}")
+                return parsed_date
         except Exception as e:
             self.logger.warning(f"日時解析エラー: {e}")
         return None
@@ -280,12 +339,13 @@ class EmailMonitorEnhanced:
         
         return body
     
-    def _extract_download_url(self, msg: email.message.Message) -> Optional[str]:
+    def _extract_download_url(self, msg: email.message.Message, purpose: str = 'download') -> Optional[str]:
         """
         メールからダウンロードURLを抽出
         
         Args:
             msg: メールメッセージ
+            purpose: 'download' または 'error_check'
         
         Returns:
             ダウンロードURL（見つからない場合はNone）
@@ -300,17 +360,17 @@ class EmailMonitorEnhanced:
             
             self.logger.info(f"メール本文の長さ: {len(body)}文字")
             
-            # Word2XHTML5のダウンロードURLパターン
-            # PDFファイルのURLを探す（改行やスペースを考慮）
-            pdf_url_pattern = r'(http://trial\.nextpublishing\.jp/upload_46tate/do_download_pdf\?n=[^\s<>"{}|\\^`\[\]]+)'
-            pdf_urls = re.findall(pdf_url_pattern, body, re.MULTILINE | re.DOTALL)
+            # EmailProcessorを使用してURLを抽出
+            urls = self.email_processor.extract_urls(body)
+            if not urls:
+                self.logger.warning("URLが見つかりませんでした")
+                return None
             
-            self.logger.info(f"PDFパターンマッチ結果: {len(pdf_urls)}件")
-            
-            if pdf_urls:
-                # 最初のPDF URLを返す
-                self.logger.info(f"見つかったPDF URL: {pdf_urls[0]}")
-                return pdf_urls[0]
+            # 目的に応じたURLを取得
+            download_url = self.email_processor.get_url_for_purpose(urls, purpose)
+            if download_url:
+                self.logger.info(f"{purpose}用URLを取得: {download_url}")
+                return download_url
             
             # ZIPファイルのURLも試す（ReVIEW変換の場合）
             zip_url_pattern = r'(https?://[^\s<>"{}|\\^`\[\]]+\.zip)'

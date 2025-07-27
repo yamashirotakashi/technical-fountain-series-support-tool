@@ -75,6 +75,41 @@ class TestSlackPDFPoster(unittest.TestCase):
         result = self.poster.find_slack_channel("1234")
         self.assertIsNone(result)
     
+    def test_find_slack_channel_various_patterns(self):
+        """様々なチャネル名パターンのテスト"""
+        mock_slack_integration = Mock()
+        mock_slack_integration.get_bot_channels.return_value = [
+            {"name": "n1234-traditional-pattern"},    # 従来パターン
+            {"name": "1235-numeric-only"},            # 数字のみパターン
+            {"name": "book-1236-middle"},             # 中間に数字
+            {"name": "project1237something"},         # 数字を含む
+            {"name": "general"},
+        ]
+        
+        self.poster.slack_integration = mock_slack_integration
+        
+        # 各パターンのテスト
+        self.assertEqual(self.poster.find_slack_channel("1234"), "n1234-traditional-pattern")
+        self.assertEqual(self.poster.find_slack_channel("1235"), "1235-numeric-only")
+        self.assertEqual(self.poster.find_slack_channel("1236"), "book-1236-middle")
+        self.assertEqual(self.poster.find_slack_channel("1237"), "project1237something")
+    
+    def test_find_slack_channel_priority_order(self):
+        """検索優先順位のテスト"""
+        mock_slack_integration = Mock()
+        mock_slack_integration.get_bot_channels.return_value = [
+            {"name": "project1234something"},         # 優先度低
+            {"name": "book-1234-middle"},             # 優先度中
+            {"name": "1234-numeric-start"},           # 優先度高
+            {"name": "n1234-traditional"},            # 最優先
+        ]
+        
+        self.poster.slack_integration = mock_slack_integration
+        
+        # 最優先のn1234-traditionalが選ばれることを確認
+        result = self.poster.find_slack_channel("1234")
+        self.assertEqual(result, "n1234-traditional")
+    
     def test_find_pdf_file_single_file(self):
         """PDFファイルが1つある場合のテスト"""
         with tempfile.TemporaryDirectory() as tmpdir:

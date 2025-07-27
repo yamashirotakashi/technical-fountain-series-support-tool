@@ -21,7 +21,16 @@ class GoogleSheetClient:
         self.logger = get_logger(__name__)
         self.config = get_config()
         self.service = None
+        
+        # Sheet IDを取得（デバッグログ付き）
         self.sheet_id = self.config.get('google_sheet.sheet_id')
+        self.logger.info(f"設定から取得したSheet ID: {self.sheet_id}")
+        
+        # Sheet IDが無効な場合のチェック
+        if not self.sheet_id or self.sheet_id == "YOUR_SHEET_ID_HERE" or self.sheet_id == "your-sheet-id":
+            self.logger.error(f"無効なSheet ID: {self.sheet_id}")
+            raise ValueError("Google Sheet IDが設定されていません。設定画面から正しいSheet IDを設定してください。")
+        
         self._authenticate()
     
     def _authenticate(self):
@@ -73,10 +82,17 @@ class GoogleSheetClient:
         
         # A列とC列のデータを取得（1000行まで）
         range_name = 'A1:C1000'
-        result = self.service.spreadsheets().values().get(
-            spreadsheetId=self.sheet_id,
-            range=range_name
-        ).execute()
+        self.logger.debug(f"API呼び出し - Sheet ID: {self.sheet_id}, Range: {range_name}")
+        
+        try:
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.sheet_id,
+                range=range_name
+            ).execute()
+        except HttpError as e:
+            self.logger.error(f"Google Sheets API エラー: {e}")
+            self.logger.error(f"使用したSheet ID: {self.sheet_id}")
+            raise
         
         values = result.get('values', [])
         

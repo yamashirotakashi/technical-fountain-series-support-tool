@@ -1,13 +1,13 @@
-﻿"""メインウィンドウモジュール"""
+"""メインウィンドウモジュール"""
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QSplitter, QMenuBar, QStatusBar, QMessageBox,
                              QInputDialog, QLineEdit, QDialog)
 from PyQt6.QtCore import Qt, pyqtSlot, QThread, pyqtSignal, QCoreApplication
 from PyQt6.QtGui import QIcon, QAction
 
-from gui.components.input_panel_qt6 import InputPanel
-from gui.components.log_panel_qt6 import LogPanel
-from gui.components.progress_bar_qt6 import ProgressPanel
+from gui.components.input_panel import InputPanel
+from gui.components.log_panel import LogPanel
+from gui.components.progress_bar import ProgressPanel
 from gui.dialogs import FolderSelectorDialog
 from gui.dialogs.simple_file_selector_dialog import SimpleFileSelectorDialog
 from gui.dialogs.process_mode_dialog import ProcessModeDialog
@@ -16,6 +16,7 @@ from core.workflow_processor import WorkflowProcessor
 from core.api_processor import ApiProcessor
 from utils.logger import get_logger
 from pathlib import Path
+import os
 
 
 class ProcessWorker(QThread):
@@ -149,6 +150,11 @@ class MainWindow(QMainWindow):
         # セパレータ
         tools_menu.addSeparator()
         
+        # 設定アクション
+        settings_action = QAction("設定(&S)", self)
+        settings_action.triggered.connect(self.show_comprehensive_settings)
+        tools_menu.addAction(settings_action)
+        
         # リポジトリ設定アクション
         repo_settings_action = QAction("リポジトリ設定(&R)", self)
         repo_settings_action.triggered.connect(self.show_repository_settings)
@@ -171,8 +177,9 @@ class MainWindow(QMainWindow):
     def connect_signals(self):
         """シグナルを接続"""
         # 入力パネルからのシグナル
-        self.input_panel.processing_requested.connect(self.start_processing)
+        self.input_panel.process_requested.connect(self.start_processing)
         self.input_panel.settings_requested.connect(self.show_process_mode_dialog)
+        self.input_panel.pdf_post_requested.connect(self.start_pdf_post)
         # self.input_panel.preflight_requested.connect(self.show_preflight_check)  # 削除
         self.input_panel.error_check_requested.connect(self.start_error_detection)
     
@@ -207,7 +214,7 @@ class MainWindow(QMainWindow):
             ProcessModeDialog.MODE_GMAIL_API: "Gmail API方式"
         }
         mode_text = mode_text_map.get(self.process_mode, "不明")
-        self.log_panel.append_log(f"処理方式: {mode_text}", "INFO")
+        self.log_panel.append_log(f"処理方式: {mode_text}")
         
         # 確認ダイアログ
         message = f"処理方式: {mode_text}\n\n以下のNコードを処理します:\n" + "\n".join(n_codes)
@@ -234,7 +241,7 @@ class MainWindow(QMainWindow):
             if reply == QMessageBox.StandardButton.Yes:
                 if self.process_mode == ProcessModeDialog.MODE_GMAIL_API:
                     # Gmail API方式の場合
-                    self.log_panel.append_log("Gmail APIを使用してメール監視を行います", "INFO")
+                    self.log_panel.append_log("Gmail APIを使用してメール監視を行います")
                     email_password = "GMAIL_API"  # ダミー値（WorkflowProcessorで判定）
                 else:
                     # 従来方式の場合
@@ -253,7 +260,7 @@ class MainWindow(QMainWindow):
                         if not ok or not email_password:
                             email_password = None
                     else:
-                        self.log_panel.append_log("環境変数からメールパスワードを取得しました", "INFO")
+                        self.log_panel.append_log("環境変数からメールパスワードを取得しました")
         
         # UIを無効化
         self.input_panel.set_enabled(False)
@@ -269,12 +276,12 @@ class MainWindow(QMainWindow):
             ProcessModeDialog.MODE_GMAIL_API: "Gmail API方式"
         }
         mode_text = mode_text_map.get(self.process_mode, "不明")
-        self.log_panel.append_log(f"処理を開始します（{mode_text}）", "INFO")
+        self.log_panel.append_log(f"処理を開始します（{mode_text}）")
         for n_code in n_codes:
-            self.log_panel.append_log(f"キューに追加: {n_code}", "INFO")
+            self.log_panel.append_log(f"キューに追加: {n_code}")
         
         # デバッグ：現在の処理モードを確認
-        self.log_panel.append_log(f"[DEBUG] 処理開始時のprocess_mode = {repr(self.process_mode)}", "DEBUG")
+        self.log_panel.append_log(f"[DEBUG] 処理開始時のprocess_mode = {repr(self.process_mode)}")
         
         # ワーカースレッドを作成して開始
         self.worker_thread = ProcessWorker(n_codes, email_password, self.process_mode)
@@ -333,11 +340,23 @@ class MainWindow(QMainWindow):
             "自動化・効率化するために開発されました。"
         )
     
+    def show_comprehensive_settings(self):
+        """包括的な設定ダイアログを表示"""
+        from gui.comprehensive_settings_dialog import ComprehensiveSettingsDialog
+        dialog = ComprehensiveSettingsDialog(self)
+        dialog.settings_updated.connect(self.on_settings_updated)
+        dialog.exec()
+        
     def show_repository_settings(self):
         """リポジトリ設定ダイアログを表示"""
         from gui.repository_settings_dialog import RepositorySettingsDialog
         dialog = RepositorySettingsDialog(self)
         dialog.exec()
+        
+    @pyqtSlot()
+    def on_settings_updated(self):
+        """設定が更新された時の処理"""
+        self.log_panel.append_log("設定が更新されました。")
     
     @pyqtSlot(object, str, object)
     def on_folder_selection_needed(self, repo_path, repo_name, default_folder):
@@ -352,9 +371,9 @@ class MainWindow(QMainWindow):
         
         # ダイアログのシグナルを接続
         def on_folder_confirmed(folder_path, save_settings):
-            self.log_panel.append_log(f"作業フォルダを選択: {folder_path}", "INFO")
+            self.log_panel.append_log(f"作業フォルダを選択: {folder_path}")
             if save_settings:
-                self.log_panel.append_log("フォルダ設定を保存しました", "INFO")
+                self.log_panel.append_log("フォルダ設定を保存しました")
             
             # ワークフロープロセッサに選択結果を設定
             if self.worker_thread and self.worker_thread.workflow_processor:
@@ -366,7 +385,7 @@ class MainWindow(QMainWindow):
         result = dialog.exec()
         if result != QDialog.DialogCode.Accepted:
             # キャンセルされた場合
-            self.log_panel.append_log("フォルダ選択がキャンセルされました", "WARNING")
+            self.log_panel.append_log("フォルダ選択がキャンセルされました")
             if self.worker_thread and self.worker_thread.workflow_processor:
                 self.worker_thread.workflow_processor.set_selected_work_folder(None)
     
@@ -401,7 +420,7 @@ class MainWindow(QMainWindow):
             clicked_button = msg_box.clickedButton()
             
             if clicked_button == cancel_btn:
-                self.log_panel.append_log("ファイル配置がキャンセルされました", "INFO")
+                self.log_panel.append_log("ファイル配置がキャンセルされました")
                 if callback:
                     callback([])
                 return
@@ -412,22 +431,22 @@ class MainWindow(QMainWindow):
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     selected_files = dialog.get_selected_files()
                     print(f"[DEBUG] MainWindow: ダイアログから取得したファイル数: {len(selected_files)}")
-                    self.log_panel.append_log(f"ファイル選択: {len(selected_files)}個を選択", "INFO")
+                    self.log_panel.append_log(f"ファイル選択: {len(selected_files)}個を選択")
                     if callback:
                         print(f"[DEBUG] MainWindow: callbackを呼び出します")
                         callback(selected_files)
                 else:
-                    self.log_panel.append_log("ファイル選択がキャンセルされました", "INFO")
+                    self.log_panel.append_log("ファイル選択がキャンセルされました")
                     if callback:
                         callback([])
             else:
                 # 全ファイルを配置
-                self.log_panel.append_log(f"ファイル配置確認: 全{len(file_list)}個のファイルを配置", "INFO")
+                self.log_panel.append_log(f"ファイル配置確認: 全{len(file_list)}個のファイルを配置")
                 if callback:
                     callback(file_list)
                 
         except Exception as e:
-            self.log_panel.append_log(f"確認ダイアログエラー: {e}", "ERROR")
+            self.log_panel.append_log(f"確認ダイアログエラー: {e}")
             if callback:
                 callback([])
     
@@ -488,7 +507,7 @@ class MainWindow(QMainWindow):
             }
             mode_text = mode_text_map.get(self.process_mode, "不明")
             
-            self.log_panel.append_log(f"処理方式を変更: {mode_text}", "INFO")
+            self.log_panel.append_log(f"処理方式を変更: {mode_text}")
             self.status_bar.showMessage(f"処理方式: {mode_text}")
     
     # Pre-flight Check関数を削除
@@ -496,7 +515,7 @@ class MainWindow(QMainWindow):
     @pyqtSlot(list, str)
     def on_warning_dialog_needed(self, messages, result_type):
         """API処理の警告ダイアログを表示"""
-        self.log_panel.append_log(f"警告ダイアログ表示要求: {len(messages)}件のメッセージ ({result_type})", "INFO")
+        self.log_panel.append_log(f"警告ダイアログ表示要求: {len(messages)}件のメッセージ ({result_type})")
         
         # シンプルなQMessageBoxアプローチを使用（一時的な回避策）
         USE_SIMPLE_DIALOG = True
@@ -505,7 +524,7 @@ class MainWindow(QMainWindow):
             # QMessageBoxベースのシンプルなダイアログ
             from gui.dialogs.simple_warning_dialog import show_warning_dialog
             show_warning_dialog(self, messages, result_type)
-            self.log_panel.append_log("警告ダイアログを閉じました", "INFO")
+            self.log_panel.append_log("警告ダイアログを閉じました")
         else:
             # カスタムダイアログ（元の実装）
             # イベントを処理させる
@@ -517,7 +536,7 @@ class MainWindow(QMainWindow):
             # モーダルダイアログとして実行
             result = dialog.exec()
             
-            self.log_panel.append_log(f"警告ダイアログを閉じました (結果: {result})", "INFO")
+            self.log_panel.append_log(f"警告ダイアログを閉じました (結果: {result})")
     
     @pyqtSlot(list)
     def start_error_detection(self, n_codes):
@@ -570,10 +589,11 @@ class MainWindow(QMainWindow):
         from core.workflow_processor_with_error_detection import WorkflowProcessorWithErrorDetection
         
         email_address = os.getenv('GMAIL_ADDRESS', 'yamashiro.takashi@gmail.com')
+        # エラー検知フローは常にAPI方式を使用
         self.error_detection_processor = WorkflowProcessorWithErrorDetection(
             email_address=email_address,
             email_password=email_password,
-            process_mode=self.process_mode
+            process_mode='api'  # エラー検知は常にAPI方式
         )
         
         # シグナルを接続
@@ -592,8 +612,8 @@ class MainWindow(QMainWindow):
         self.progress_panel.update_status("エラーファイル検知フロー実行中...")
         
         # ログに開始を記録
-        self.log_panel.append_log("エラーファイル検知フローを開始します", "INFO")
-        self.log_panel.append_log(f"対象Nコード: {', '.join(n_codes)}", "INFO")
+        self.log_panel.append_log("エラーファイル検知フローを開始します")
+        self.log_panel.append_log(f"対象Nコード: {', '.join(n_codes)}")
         
         # 処理を別スレッドで実行（QThreadを使用）
         class ErrorDetectionWorker(QThread):
@@ -614,7 +634,7 @@ class MainWindow(QMainWindow):
     @pyqtSlot()
     def on_error_detection_finished(self):
         """エラー検知処理完了時の処理"""
-        self.log_panel.append_log("エラー検知処理が完了しました", "INFO")
+        self.log_panel.append_log("エラー検知処理が完了しました")
         
         # 画面を初期状態に戻す
         self.input_panel.set_enabled(True)
@@ -622,7 +642,7 @@ class MainWindow(QMainWindow):
         self.status_bar.showMessage("準備完了")
         
         # ログに区切り線を追加
-        self.log_panel.append_log("=" * 50, "INFO")
+        self.log_panel.append_log("=" * 50)
         
         # スレッドのクリーンアップ
         if self.error_detection_thread:
@@ -632,9 +652,9 @@ class MainWindow(QMainWindow):
     def on_file_processed(self, filename, success, message):
         """ファイル処理完了時の処理"""
         if success:
-            self.log_panel.append_log(f"✓ {filename}: {message}", "INFO")
+            self.log_panel.append_log(f"✓ {filename}: {message}")
         else:
-            self.log_panel.append_log(f"✗ {filename}: {message}", "ERROR")
+            self.log_panel.append_log(f"✗ {filename}: {message}")
     
     @pyqtSlot(list, object)
     def on_error_file_selection_needed(self, file_list, callback):
@@ -667,7 +687,7 @@ class MainWindow(QMainWindow):
             clicked_button = msg_box.clickedButton()
             
             if clicked_button == cancel_btn:
-                self.log_panel.append_log("エラー検知がキャンセルされました", "INFO")
+                self.log_panel.append_log("エラー検知がキャンセルされました")
                 if callback:
                     callback([])
                 return
@@ -678,21 +698,21 @@ class MainWindow(QMainWindow):
                 dialog.setWindowTitle("エラー検知ファイル選択")
                 if dialog.exec() == QDialog.DialogCode.Accepted:
                     selected_files = dialog.get_selected_files()
-                    self.log_panel.append_log(f"エラー検知ファイル選択: {len(selected_files)}個を選択", "INFO")
+                    self.log_panel.append_log(f"エラー検知ファイル選択: {len(selected_files)}個を選択")
                     if callback:
                         callback(selected_files)
                 else:
-                    self.log_panel.append_log("ファイル選択がキャンセルされました", "INFO")
+                    self.log_panel.append_log("ファイル選択がキャンセルされました")
                     if callback:
                         callback([])
             else:
                 # 全てのファイルを検査
-                self.log_panel.append_log(f"全ファイル（{len(file_list)}個）を検査します", "INFO")
+                self.log_panel.append_log(f"全ファイル（{len(file_list)}個）を検査します")
                 if callback:
                     callback(file_list)
                     
         except Exception as e:
-            self.log_panel.append_log(f"ファイル選択エラー: {e}", "ERROR")
+            self.log_panel.append_log(f"ファイル選択エラー: {e}")
             if callback:
                 callback([])
     
@@ -745,3 +765,99 @@ class MainWindow(QMainWindow):
             delattr(self, 'error_detection_processor')
         if hasattr(self, 'error_detection_thread'):
             delattr(self, 'error_detection_thread')
+    
+    @pyqtSlot(str)
+    def start_pdf_post(self, n_code):
+        """
+        PDF投稿を開始
+        
+        Args:
+            n_code: 投稿するN番号
+        """
+        try:
+            # SlackPDFPosterとPDFPostDialogをインポート
+            from src.slack_pdf_poster import SlackPDFPoster
+            from gui.pdf_post_dialog import PDFPostDialog
+            
+            # PDF投稿インスタンスを作成
+            poster = SlackPDFPoster()
+            
+            # 入力検証
+            is_valid, error_msg = poster.validate_inputs(n_code)
+            if not is_valid:
+                QMessageBox.warning(self, "入力エラー", error_msg)
+                return
+            
+            # チャネル番号を抽出
+            try:
+                channel_number = poster.extract_channel_number(n_code)
+            except ValueError as e:
+                QMessageBox.warning(self, "入力エラー", str(e))
+                return
+            
+            # Slackチャネルを検索
+            channel_name = poster.find_slack_channel(channel_number)
+            if not channel_name:
+                QMessageBox.warning(
+                    self, 
+                    "チャネルが見つかりません",
+                    f"N番号 {n_code} に対応するSlackチャネルが見つかりませんでした。\n\n"
+                    f"検索パターン: n{channel_number}-*\n\n"
+                    f"以下を確認してください:\n"
+                    f"・チャネルが存在するか\n"
+                    f"・Botがチャネルに招待されているか"
+                )
+                return
+            
+            # PDFファイルを検索（仮のパス - 実際の設定から取得する必要がある）
+            import os
+            from pathlib import Path
+            
+            # NコードからPDFファイルを検索（NP-IRD配下）
+            pdf_path = poster.find_pdf_file(n_code)
+            if not pdf_path:
+                QMessageBox.warning(
+                    self, 
+                    "PDFファイルが見つかりません",
+                    f"N番号 {n_code} のPDFファイルが見つかりませんでした。\n\n"
+                    f"検索場所: G:\\.shortcut-targets-by-id\\...\\NP-IRD\\{n_code}\\out\\\n\n"
+                    f"以下を確認してください:\n"
+                    f"・Nフォルダが存在するか\n"
+                    f"・outフォルダが存在するか\n"
+                    f"・PDFファイルが生成されているか"
+                )
+                return
+            
+            # 確認ダイアログを表示
+            default_message = poster.get_default_message()
+            dialog = PDFPostDialog(pdf_path, channel_name, default_message, self)
+            
+            approved, message = dialog.get_confirmation()
+            if not approved:
+                self.log_panel.append_log("PDF投稿がキャンセルされました")
+                return
+            
+            # Slack投稿を実行
+            self.log_panel.append_log(f"PDF投稿を開始: {n_code} -> #{channel_name}")
+            success, result = poster.post_to_slack(pdf_path, channel_name, message)
+            
+            if success:
+                QMessageBox.information(
+                    self,
+                    "投稿完了", 
+                    f"#{channel_name} への投稿が完了しました。\n\n"
+                    f"ファイル: {Path(pdf_path).name}"
+                )
+                self.log_panel.append_log(f"PDF投稿成功: {result}")
+            else:
+                QMessageBox.critical(
+                    self,
+                    "投稿エラー",
+                    f"PDF投稿に失敗しました:\n\n{result}"
+                )
+                self.log_panel.append_log(f"PDF投稿失敗: {result}")
+                
+        except Exception as e:
+            error_msg = f"PDF投稿処理中にエラーが発生しました: {str(e)}"
+            QMessageBox.critical(self, "エラー", error_msg)
+            self.log_panel.append_log(error_msg)

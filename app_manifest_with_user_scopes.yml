@@ -1,0 +1,31 @@
+display_information:
+  name: TechZip PDF Bot
+  description: 技術の泉シリーズPDF自動投稿Bot
+  background_color: "#2C2D30"
+  
+features:
+  bot_user:
+    display_name: TechZip PDF Bot
+    always_online: true
+    
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - files:write
+      - groups:read
+      - groups:write
+      - groups:write.invites
+      - users:read
+    user:  # User Scopesを追加
+      - channels:read
+      - groups:read
+      - groups:write
+      - users:read
+      
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
+  
+# Incoming Webhookは削除（Phase 1では不要）

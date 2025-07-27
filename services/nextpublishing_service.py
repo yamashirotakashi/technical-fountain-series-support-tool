@@ -240,10 +240,11 @@ class NextPublishingService:
             self.logger.info(f"最終URL: {response.url}")
             self.logger.info(f"Content-Type: {response.headers.get('Content-Type', 'なし')}")
             
-            # 401エラーは認証が必要なだけで、PDFは存在する（ブラウザでダウンロード可能）
+            # 401エラーの場合、認証情報が正しく送信されていない可能性がある
             if response.status_code == 401:
-                self.logger.info("401エラー: 認証が必要ですが、PDFは生成済みと判断")
-                return True, "PDFダウンロード可能（要認証）"
+                self.logger.error("401エラー: 認証に失敗しました")
+                self.logger.error(f"使用中の認証情報: username={self.session.auth.username}")
+                return False, "認証エラー（401）"
             
             if response.status_code == 200:
                 # まずContent-Typeとファイル内容を確認

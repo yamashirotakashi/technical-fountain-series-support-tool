@@ -4,26 +4,38 @@
 import sys
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
-# .envファイルを読み込む
-load_dotenv()
-
-# プロジェクトのルートディレクトリをPythonパスに追加
+# プロジェクトのルートディレクトリをPythonパスに追加（インポート前に必要）
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
+
+# パス解決と環境変数管理システムをインポート
+from utils.path_resolver import PathResolver
+from utils.env_manager import EnvManager
+from utils.config import reset_config
+
+# 環境変数管理システムを初期化（.envファイルの読み込みを含む）
+EnvManager.initialize()
+
+# EXE環境では設定をリセットして最新の値を読み込む
+if PathResolver.is_exe_environment():
+    reset_config()
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 from gui.main_window import MainWindow
 from utils.logger import get_logger
+from utils.startup_logger import StartupLogger
 
 
 def main():
     """アプリケーションのエントリーポイント"""
     # ロガーを初期化
     logger = get_logger(__name__)
-    logger.info("アプリケーションを起動します")
+    
+    # 起動時ログ収集を開始
+    startup_logger = StartupLogger()
+    startup_logger.collect_startup_info()
     
     # High DPI対応（Qt6では自動的に有効）
     # Qt6ではこれらの属性は削除されているため、設定不要
@@ -38,6 +50,14 @@ def main():
     
     # メインウィンドウを作成して表示
     window = MainWindow()
+    
+    # 起動時ログをGUIに表示
+    startup_logs = startup_logger.format_logs_for_display()
+    window.log_panel.append_log("=== 起動時診断情報 ===")
+    for line in startup_logs.split('\n'):
+        window.log_panel.append_log(line)
+    window.log_panel.append_log("=== 起動完了 ===")
+    
     window.show()
     
     logger.info("メインウィンドウを表示しました")
