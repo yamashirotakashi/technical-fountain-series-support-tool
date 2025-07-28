@@ -1,0 +1,99 @@
+{
+  "test_timestamp": "2025-07-28T23:20:56.286358",
+  "tests": [
+    {
+      "test_name": "backup_functionality",
+      "start_time": "2025-07-28T23:20:56.286380",
+      "success": true,
+      "details": [
+        {
+          "step": "backup_necessity_check",
+          "result": "Should backup: True, Reason: CLAUDE.mdファイルが更新されています: /mnt/c/Users/tky99/dev/CLAUDE.md"
+        },
+        {
+          "step": "list_backups",
+          "result": "Available backups: 2"
+        },
+        {
+          "step": "latest_backup_info",
+          "result": "Latest: daily_backup_20250728.zip - 2025-07-28 23:12:21"
+        }
+      ],
+      "end_time": "2025-07-28T23:20:56.293576"
+    },
+    {
+      "test_name": "restore_dry_run",
+      "start_time": "2025-07-28T23:20:56.293584",
+      "success": true,
+      "details": [
+        {
+          "step": "backup_content_analysis",
+          "result": {
+            "file_size": 39660,
+            "contains_claude_config": true,
+            "contains_claude_md": true,
+            "contains_system_info": true,
+            "file_count": 11
+          }
+        },
+        {
+          "step": "restore_simulation",
+          "result": {
+            "backup_file": "/mnt/c/Users/tky99/dev/.claude_code_backups/daily_backup_20250728.zip",
+            "extraction_test": true,
+            "file_structure_valid": true,
+            "restoration_steps": [
+              "1. バックアップ展開",
+              "2. 設定ファイル準備",
+              "3. CLAUDE.mdファイル準備",
+              "4. システム情報確認"
+            ]
+          }
+        }
+      ],
+      "end_time": "2025-07-28T23:20:56.309711"
+    },
+    {
+      "test_name": "recovery_diagnosis",
+      "start_time": "2025-07-28T23:20:56.309727",
+      "success": true,
+      "details": [
+        {
+          "step": "diagnosis_execution",
+          "result": {
+            "config_exists": true,
+            "config_files_count": 3,
+            "claude_command_works": true,
+            "auth_error_detected": false
+          }
+        }
+      ],
+      "end_time": "2025-07-28T23:20:57.610354"
+    },
+    {
+      "test_name": "powershell_command",
+      "start_time": "2025-07-28T23:20:57.610372",
+      "success": true,
+      "details": [
+        {
+          "step": "script_existence_check",
+          "result": "PowerShell script exists: True"
+        },
+        {
+          "step": "script_content_validation",
+          "result": "Available actions: ['full-recovery', 'quick-recovery', 'diagnose', 'backup', 'list']"
+        },
+        {
+          "step": "wsl_integration_check",
+          "result": "WSL integration: True"
+        }
+      ],
+      "end_time": "2025-07-28T23:20:57.612249"
+    }
+  ],
+  "summary": {
+    "total_tests": 4,
+    "successful_tests": 4,
+    "success_rate": "4/4 (100.0%)"
+  }
+}

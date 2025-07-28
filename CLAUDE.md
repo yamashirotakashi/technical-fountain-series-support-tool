@@ -140,15 +140,27 @@ GMAIL_APP_PASSWORD=your_app_password_here
   3. GUIからのリポジトリ設定管理（ツール→リポジトリ設定）
   4. 環境変数`GITHUB_TOKEN`によるプライベートリポジトリ対応
 
-## 🎯 次期開発計画（2025-01-27策定）
+## 🎯 次期開発計画（2025-07-28更新）
 
-### Phase 1: Slack統合（2025年2月予定）
+### 🚨 直近最優先: CodeBlockOverFlowDisposal Phase2統合
+**Phase1完了済み（2025-07-28）**: OCRベース右端はみ出し検出システム実装完了
+
+**Phase2統合内容**:
+1. **OCRBasedOverflowDetectorライブラリ化**（共通ライブラリ化）
+2. **Qt6 GUIコンポーネント作成**（品質チェックタブ）
+3. **PDF後処理フック実装**（Word変換後自動検査）
+4. **設定ファイル統合**（settings.json拡張）
+
+**推定工数**: 10-15時間
+**詳細**: `/CodeBlockOverFlowDisposal/PHASE1_COMPLETION_REPORT.md`
+
+### Phase 3: Slack統合（延期）
 - PDF生成完了後の自動Slack投稿機能
 - 新規にSlack Bot作成（PDF投稿機能）
 - 「完了後Slackに投稿」オプション追加
 - 詳細: `/docs/TECHZIP_DEVELOPMENT_ROADMAP.md`
 
-### Phase 2: TechZip Admin（2025年3月予定）
+### Phase 4: TechZip Admin（延期）
 - プロジェクト初期化専用の管理者ツール（別アプリ）
 - Slack/GitHubリソースの一括作成
 - 高権限操作の安全な実行
