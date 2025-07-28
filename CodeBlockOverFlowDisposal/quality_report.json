@@ -1,0 +1,78 @@
+{
+  "timestamp": "2025-07-28T22:40:43.126471",
+  "overall_status": "PASS",
+  "execution_time": 4.89746618270874,
+  "metrics": [
+    {
+      "name": "要件仕様書",
+      "value": 1.0,
+      "threshold": 1.0,
+      "status": "PASS",
+      "message": "要件仕様書が存在します"
+    },
+    {
+      "name": "設計仕様書",
+      "value": 1.0,
+      "threshold": 1.0,
+      "status": "PASS",
+      "message": "設計仕様書が存在します"
+    },
+    {
+      "name": "実装整合性",
+      "value": 1.0,
+      "threshold": 0.8,
+      "status": "PASS",
+      "message": "仕様との整合性: 100.0%"
+    },
+    {
+      "name": "PEP8準拠",
+      "value": 1.0,
+      "threshold": 0.9,
+      "status": "PASS",
+      "message": "コードスタイル適合率: 100.0%"
+    },
+    {
+      "name": "コード複雑度",
+      "value": 0.07216494845360821,
+      "threshold": 0.8,
+      "status": "WARNING",
+      "message": "複雑度スコア: 0.07"
+    },
+    {
+      "name": "型ヒント",
+      "value": 0.6,
+      "threshold": 0.8,
+      "status": "WARNING",
+      "message": "型ヒント適用率: 60.0%"
+    },
+    {
+      "name": "基本機能",
+      "value": 1.0,
+      "threshold": 1.0,
+      "status": "PASS",
+      "message": "基本機能の動作テスト"
+    },
+    {
+      "name": "エラーハンドリング",
+      "value": 0.5,
+      "threshold": 1.0,
+      "status": "WARNING",
+      "message": "異常系処理のテスト"
+    },
+    {
+      "name": "起動時間",
+      "value": 1.0,
+      "threshold": 0.8,
+      "status": "PASS",
+      "message": "起動時間: 1.51秒"
+    },
+    {
+      "name": "セキュリティ",
+      "value": 1.0,
+      "threshold": 0.9,
+      "status": "PASS",
+      "message": "セキュリティスコア: 1.00"
+    }
+  ],
+  "errors": []
+}

@@ -1,0 +1,35 @@
+{
+  "target_system": "技術の泉シリーズ制作支援ツール",
+  "integration_points": [
+    {
+      "name": "PDF後処理フック",
+      "description": "Word変換後のPDFをはみ出し検査",
+      "location": "core/workflow_processor.py",
+      "method": "post_pdf_processing"
+    },
+    {
+      "name": "品質チェックGUI",
+      "description": "メインGUIに品質チェック機能追加",
+      "location": "gui/main_window_qt6.py",
+      "method": "add_quality_check_tab"
+    },
+    {
+      "name": "バッチ処理統合",
+      "description": "複数PDF一括検査機能",
+      "location": "core/file_manager.py",
+      "method": "batch_overflow_check"
+    }
+  ],
+  "technical_requirements": [
+    "OCRBasedOverflowDetectorクラスの共通ライブラリ化",
+    "Qt6 GUIコンポーネントの作成",
+    "設定ファイル統合（settings.json拡張）",
+    "ログシステム統合"
+  ],
+  "estimated_effort": "10-15時間",
+  "dependencies": [
+    "Phase 1完了",
+    "メインシステムのQt6移行完了",
+    "設定管理システムの拡張"
+  ]
+}
