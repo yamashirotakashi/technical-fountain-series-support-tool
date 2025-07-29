@@ -1,35 +1,35 @@
 {
-  "test_timestamp": "2025-07-28T23:20:56.286358",
+  "test_timestamp": "2025-07-28T23:50:33.074449",
   "tests": [
     {
       "test_name": "backup_functionality",
-      "start_time": "2025-07-28T23:20:56.286380",
+      "start_time": "2025-07-28T23:50:33.074468",
       "success": true,
       "details": [
         {
           "step": "backup_necessity_check",
-          "result": "Should backup: True, Reason: CLAUDE.mdファイルが更新されています: /mnt/c/Users/tky99/dev/CLAUDE.md"
+          "result": "Should backup: False, Reason: バックアップは最新です"
         },
         {
           "step": "list_backups",
-          "result": "Available backups: 2"
+          "result": "Available backups: 4"
         },
         {
           "step": "latest_backup_info",
-          "result": "Latest: daily_backup_20250728.zip - 2025-07-28 23:12:21"
+          "result": "Latest: daily_backup_20250728.zip - 2025-07-28 23:50:32"
         }
       ],
-      "end_time": "2025-07-28T23:20:56.293576"
+      "end_time": "2025-07-28T23:50:33.096184"
     },
     {
       "test_name": "restore_dry_run",
-      "start_time": "2025-07-28T23:20:56.293584",
+      "start_time": "2025-07-28T23:50:33.096194",
       "success": true,
       "details": [
         {
           "step": "backup_content_analysis",
           "result": {
-            "file_size": 39660,
+            "file_size": 39699,
             "contains_claude_config": true,
             "contains_claude_md": true,
             "contains_system_info": true,
@@ -51,11 +51,11 @@
           }
         }
       ],
-      "end_time": "2025-07-28T23:20:56.309711"
+      "end_time": "2025-07-28T23:50:33.114368"
     },
     {
       "test_name": "recovery_diagnosis",
-      "start_time": "2025-07-28T23:20:56.309727",
+      "start_time": "2025-07-28T23:50:33.114383",
       "success": true,
       "details": [
         {
@@ -68,11 +68,11 @@
           }
         }
       ],
-      "end_time": "2025-07-28T23:20:57.610354"
+      "end_time": "2025-07-28T23:50:34.376249"
     },
     {
       "test_name": "powershell_command",
-      "start_time": "2025-07-28T23:20:57.610372",
+      "start_time": "2025-07-28T23:50:34.376267",
       "success": true,
       "details": [
         {
@@ -88,7 +88,7 @@
           "result": "WSL integration: True"
         }
       ],
-      "end_time": "2025-07-28T23:20:57.612249"
+      "end_time": "2025-07-28T23:50:34.378136"
     }
   ],
   "summary": {

@@ -20,9 +20,9 @@ import os
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from overflow_detection_lib.core.detector import OCRBasedOverflowDetector
 
-from ..core.pdf_processor import PDFOverflowProcessor
-from .result_dialog import OverflowResultDialog
-from ..utils.windows_utils import normalize_path, is_windows
+from core.pdf_processor import PDFOverflowProcessor
+from gui.result_dialog import OverflowResultDialog
+from utils.windows_utils import normalize_path, is_windows
 
 class OverflowProcessorThread(QThread):
     """PDF処理用ワーカースレッド"""
@@ -41,7 +41,10 @@ class OverflowProcessorThread(QThread):
             processor = PDFOverflowProcessor(self.config)
             
             def progress_callback(page, total, detected):
-                progress = int((page / total) * 100)
+                if total > 0:
+                    progress = int((page / total) * 100)
+                else:
+                    progress = 100 if page > 0 else 0
                 self.progress_updated.emit(progress, f"ページ {page}/{total} - 検出: {detected}件")
             
             result = processor.process_pdf(self.pdf_path, progress_callback)
@@ -356,10 +359,13 @@ class OverflowCheckerMainWindow(QMainWindow):
     
     def browse_file(self):
         """ファイル参照ダイアログ"""
+        # デフォルトディレクトリを設定
+        default_dir = r"G:\.shortcut-targets-by-id\0B6euJ_grVeOeMnJLU1IyUWgxeWM\NP-IRD"
+        
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "PDFファイルを選択",
-            "",
+            default_dir,
             "PDF Files (*.pdf);;All Files (*)"
         )
         if file_path:

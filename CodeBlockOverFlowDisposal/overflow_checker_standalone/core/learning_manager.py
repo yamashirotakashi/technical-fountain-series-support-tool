@@ -13,10 +13,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import logging
 
-import utils.windows_utils as wu
-normalize_path = wu.normalize_path
-ensure_utf8_encoding = wu.ensure_utf8_encoding
-get_default_db_path = wu.get_default_db_path
+from utils.windows_utils import normalize_path, ensure_utf8_encoding, get_default_db_path
 
 class WindowsLearningDataManager:
     """Windows環境対応学習データ管理"""
@@ -310,9 +307,9 @@ class WindowsLearningDataManager:
                     data.append(row_dict)
                 
                 # ファイルに書き込み
-                from utils.windows_utils import safe_file_write
                 export_content = json.dumps(data, ensure_ascii=False, indent=2)
-                safe_file_write(export_path, export_content)
+                with open(export_path, 'w', encoding='utf-8') as f:
+                    f.write(export_content)
                 
                 self.logger.info(f"学習データエクスポート完了: {export_path}")
                 return True

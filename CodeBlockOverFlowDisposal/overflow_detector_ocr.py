@@ -23,8 +23,8 @@ class OCRBasedOverflowDetector:
     DPI = 300  # PDF→画像変換の解像度
     
     # はみ出し検出パラメータ（調整可能）
-    MIN_CONFIDENCE = 30      # OCR信頼度閾値（0-100）
-    MARGIN_TOLERANCE_PX = 20  # 右マージン許容範囲（px）
+    MIN_CONFIDENCE = 20      # OCR信頼度閾値（0-100） - 低めに設定
+    MARGIN_TOLERANCE_PX = 5   # 右マージン許容範囲（px） - 厳しく設定  
     MIN_OVERFLOW_PX = 1      # 最小はみ出し検出量（px）- 1pxでも不良品
     LEFT_MARGIN_TOLERANCE_PX = 15  # 左マージン許容範囲（px）
     

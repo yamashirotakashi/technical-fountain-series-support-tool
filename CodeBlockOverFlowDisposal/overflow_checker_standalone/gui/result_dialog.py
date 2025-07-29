@@ -15,8 +15,8 @@ from PyQt6.QtGui import QFont
 from pathlib import Path
 from typing import Dict, List
 
-from ..core.learning_manager import WindowsLearningDataManager
-from ..utils.windows_utils import is_windows
+from core.learning_manager import WindowsLearningDataManager
+from utils.windows_utils import is_windows
 
 class OverflowResultDialog(QDialog):
     """溢れチェック結果表示・学習ダイアログ"""

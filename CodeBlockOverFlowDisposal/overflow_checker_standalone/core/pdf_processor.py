@@ -12,13 +12,22 @@ from datetime import datetime
 from typing import Dict, List, Optional, Callable
 import logging
 
-# 既存のOCR検出器をインポート
+# 既存の検出器をインポート
 sys.path.append(str(Path(__file__).parent.parent.parent))
-from overflow_detection_lib.core.detector import OCRBasedOverflowDetector
+sys.path.append(str(Path(__file__).parent.parent))
 
-import utils.windows_utils as wu
-ensure_utf8_encoding = wu.ensure_utf8_encoding
-is_windows = wu.is_windows
+# ハイブリッド検出器（矩形ベース）を優先使用
+try:
+    from rect_based_detector import RectBasedOverflowDetector
+    USE_RECT_BASED = True
+except ImportError:
+    # フォールバック: OCRベース検出器
+    from overflow_detector_ocr import OCRBasedOverflowDetector
+    USE_RECT_BASED = False
+
+from utils.windows_utils import ensure_utf8_encoding, is_windows
+from utils.tesseract_config import configure_tesseract
+# Functions now imported directly above
 
 class ProcessingResult:
     """処理結果を格納するクラス"""
@@ -62,9 +71,34 @@ class PDFOverflowProcessor:
     def __init__(self, config: Dict):
         self.config = config
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
         
-        # OCR検出器の初期化
-        self.detector = OCRBasedOverflowDetector()
+        # Tesseract OCRの設定
+        configure_tesseract()
+        
+        # 検出器の初期化
+        try:
+            if USE_RECT_BASED:
+                self.detector = RectBasedOverflowDetector()
+                self.logger.info(f"検出器初期化成功: RectBasedOverflowDetector（ハイブリッド検出）")
+                self.logger.info("検出方式: コードブロック（グレー背景）からのはみ出し + 英数字の本文幅突出")
+            else:
+                self.detector = OCRBasedOverflowDetector()
+                self.logger.info(f"検出器初期化成功: OCRBasedOverflowDetector")
+                
+                # Tesseract OCRの確認
+                try:
+                    import pytesseract
+                    tesseract_version = pytesseract.get_tesseract_version()
+                    self.logger.info(f"Tesseract OCR バージョン: {tesseract_version}")
+                except Exception as ocr_error:
+                    self.logger.warning(f"Tesseract OCR確認エラー: {ocr_error}")
+                    self.logger.warning("Tesseract OCRが正しくインストールされていない可能性があります")
+                    self.logger.warning("https://github.com/UB-Mannheim/tesseract/wiki からインストールしてください")
+                
+        except Exception as e:
+            self.logger.error(f"検出器初期化エラー: {e}")
+            raise
         
         # Windows環境対応
         if config.get('windows_environment', False):
@@ -91,7 +125,8 @@ class PDFOverflowProcessor:
                 raise FileNotFoundError(f"PDFファイルが見つかりません: {pdf_path}")
             
             # OCR検出器での処理実行
-            overflow_data = self.detector.detect_overflow_pages(str(pdf_path))
+            # detect_overflowsメソッドはページごとの処理なので、PDF全体処理用のラッパーを使用
+            overflow_data = self._process_pdf_with_detector(pdf_path, progress_callback)
             
             if overflow_data:
                 # 総ページ数の取得
@@ -101,9 +136,9 @@ class PDFOverflowProcessor:
                 detected_pages = overflow_data.get('overflow_pages', [])
                 
                 for i, page_data in enumerate(detected_pages):
-                    # 進捗コールバック実行
+                    # 進捗コールバック実行（総ページ数を使用）
                     if progress_callback:
-                        progress_callback(i + 1, len(detected_pages), i + 1)
+                        progress_callback(i + 1, result.total_pages, i + 1)
                     
                     # 溢れページを結果に追加
                     result.add_overflow_page(
@@ -113,11 +148,11 @@ class PDFOverflowProcessor:
                     
                     self.logger.debug(f"溢れ検出: ページ {page_data.get('page_number', i + 1)}")
                 
-                # 最終進捗更新
+                # 最終進捗更新（総ページ数を使用）
                 if progress_callback:
                     progress_callback(
-                        len(detected_pages), 
-                        len(detected_pages), 
+                        result.total_pages, 
+                        result.total_pages, 
                         result.detection_count
                     )
             
@@ -145,6 +180,55 @@ class PDFOverflowProcessor:
             self.logger.error(f"PDF処理エラー ({pdf_path}): {e}", exc_info=True)
             
             return result
+    
+    def _process_pdf_with_detector(self, pdf_path: Path, progress_callback=None) -> Dict:
+        """既存のOCR検出器を使用してPDF全体を処理
+        
+        Args:
+            pdf_path: PDFファイルパス
+            progress_callback: 進捗コールバック
+            
+        Returns:
+            処理結果辞書
+        """
+        try:
+            self.logger.info(f"検出器でPDF処理開始: {pdf_path}")
+            
+            # OCRBasedOverflowDetectorのdetect_fileメソッドを使用
+            overflow_page_numbers = self.detector.detect_file(pdf_path)
+            
+            self.logger.info(f"検出結果: {len(overflow_page_numbers)}ページで溢れを検出")
+            if overflow_page_numbers:
+                self.logger.info(f"検出ページ: {overflow_page_numbers}")
+            
+            # PDFの総ページ数を取得
+            import PyPDF2
+            with open(pdf_path, 'rb') as file:
+                reader = PyPDF2.PdfReader(file)
+                total_pages = len(reader.pages)
+            
+            # 検出結果を辞書形式に変換
+            overflow_pages = []
+            for page_num in overflow_page_numbers:
+                overflow_pages.append({
+                    'page_number': page_num,
+                    'overflow_text': '検出済み',
+                    'overflow_amount': 0.0,
+                    'confidence': 100.0,
+                    'y_position': 0.0
+                })
+            
+            return {
+                'total_pages': total_pages,
+                'overflow_pages': overflow_pages
+            }
+            
+        except Exception as e:
+            self.logger.error(f"PDF処理エラー: {e}")
+            return {
+                'total_pages': 0,
+                'overflow_pages': []
+            }
     
     def _get_total_pages_fallback(self, pdf_path: Path) -> int:
         """総ページ数の取得（フォールバック）"""

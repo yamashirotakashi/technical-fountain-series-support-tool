@@ -33,13 +33,38 @@ pip install -r requirements.txt
 1. [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)をダウンロード・インストール
 2. インストールパス（通常 `C:\Program Files\Tesseract-OCR`）を環境変数PATHに追加
 
+## セットアップ（初回のみ）
+
+### 自動セットアップ（推奨）
+
+```powershell
+.\setup_and_run.ps1
+```
+
+このスクリプトは以下を自動実行します：
+- 仮想環境の作成
+- 必要なライブラリのインストール
+- Tesseract OCRの確認
+- アプリケーションの起動
+
 ## 使用方法
 
-### 基本的な使用方法
+### クイック起動（2回目以降）
 
-1. **アプリケーション起動**
+```powershell
+.\quick_run.ps1
+```
+
+### 手動起動
+
+1. **仮想環境のアクティベート**
    ```powershell
-   python main.py
+   .\venv\Scripts\Activate.ps1
+   ```
+
+2. **アプリケーション起動**
+   ```powershell
+   python run_ultimate.py
    ```
 
 2. **PDFファイル選択**

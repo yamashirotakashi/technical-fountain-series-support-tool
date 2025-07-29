@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 CodeBlock Overflow Checker - 独立版
-Windows PowerShell環境対応
+Windows PowerShell環境対応（パス修正版）
 
 Phase 2C-1 実装
 独立した溢れチェックアプリケーション
@@ -12,23 +12,37 @@ import sys
 import os
 from pathlib import Path
 
-# PowerShell環境でのモジュールパス設定
+# PowerShell環境での絶対パス設定
 current_dir = Path(__file__).parent.absolute()
-if str(current_dir) not in sys.path:
-    sys.path.insert(0, str(current_dir))
+parent_dir = current_dir.parent
+
+# 必要なパスを最優先で追加
+sys.path.insert(0, str(current_dir))
+sys.path.insert(0, str(parent_dir))
 
 # Windows環境での文字コード対応
 if sys.platform == 'win32':
     import locale
     import codecs
     # PowerShell環境でのUTF-8対応
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
+    try:
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
+    except:
+        pass  # バッファーが存在しない場合はスキップ
 
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
-from gui.main_window import OverflowCheckerMainWindow
-from utils.windows_utils import setup_windows_environment
+
+# モジュールインポート（例外処理付き）
+try:
+    from gui.main_window import OverflowCheckerMainWindow
+    from utils.windows_utils import setup_windows_environment
+except ImportError as e:
+    print(f"モジュールインポートエラー: {e}")
+    print(f"現在のディレクトリ: {current_dir}")
+    print(f"Pythonパス: {sys.path[:3]}")
+    sys.exit(1)
 
 def main():
     """アプリケーションメイン関数"""
