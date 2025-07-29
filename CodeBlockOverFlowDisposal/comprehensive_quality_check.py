@@ -165,7 +165,7 @@ class ComprehensiveQualityChecker:
     def _check_naming_conventions(self, tree, filename: str) -> List[Dict]:
         """命名規則チェック"""
         class NamingVisitor(ast.NodeVisitor):
-            def __init__(self, checker):
+            def __init__(self, checker, filename):
                 self.checker = checker
                 self.filename = filename
                 
@@ -192,7 +192,7 @@ class ComprehensiveQualityChecker:
     def _check_docstrings(self, tree, filename: str) -> List[Dict]:
         """docstringチェック"""
         class DocstringVisitor(ast.NodeVisitor):
-            def __init__(self, checker):
+            def __init__(self, checker, filename):
                 self.checker = checker
                 self.filename = filename
                 

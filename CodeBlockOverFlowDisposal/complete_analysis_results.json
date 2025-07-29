@@ -1,0 +1,113 @@
+{
+  "sample.pdf": {
+    "expected": [
+      48
+    ],
+    "detected": [],
+    "true_positives": [],
+    "false_positives": [],
+    "false_negatives": [
+      48
+    ],
+    "accuracy": 0.0,
+    "precision": 0
+  },
+  "sample2.pdf": {
+    "expected": [
+      128,
+      129
+    ],
+    "detected": [],
+    "true_positives": [],
+    "false_positives": [],
+    "false_negatives": [
+      128,
+      129
+    ],
+    "accuracy": 0.0,
+    "precision": 0
+  },
+  "sample3.pdf": {
+    "expected": [
+      13,
+      35,
+      36,
+      39,
+      42,
+      44,
+      45,
+      47,
+      49,
+      62,
+      70,
+      78,
+      80,
+      106,
+      115,
+      122,
+      124
+    ],
+    "detected": [],
+    "true_positives": [],
+    "false_positives": [],
+    "false_negatives": [
+      13,
+      35,
+      36,
+      39,
+      42,
+      44,
+      45,
+      47,
+      49,
+      62,
+      70,
+      78,
+      80,
+      106,
+      115,
+      122,
+      124
+    ],
+    "accuracy": 0.0,
+    "precision": 0
+  },
+  "sample4.pdf": {
+    "expected": [
+      27,
+      30,
+      38,
+      73,
+      75,
+      76
+    ],
+    "detected": [],
+    "true_positives": [],
+    "false_positives": [],
+    "false_negatives": [
+      27,
+      30,
+      38,
+      73,
+      75,
+      76
+    ],
+    "accuracy": 0.0,
+    "precision": 0
+  },
+  "sample5.pdf": {
+    "expected": [
+      128,
+      129
+    ],
+    "detected": [],
+    "true_positives": [],
+    "false_positives": [],
+    "false_negatives": [
+      128,
+      129
+    ],
+    "accuracy": 0.0,
+    "precision": 0
+  }
+}
