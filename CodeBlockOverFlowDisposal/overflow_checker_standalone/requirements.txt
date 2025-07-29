@@ -1,0 +1,23 @@
+# 独立版溢れチェッカー - 依存関係
+# Windows PowerShell環境対応
+
+# GUI Framework
+PyQt6>=6.4.0
+
+# PDF Processing
+PyPDF2>=3.0.1
+fitz>=1.19.6
+Pillow>=9.3.0
+
+# OCR
+pytesseract>=0.3.10
+opencv-python>=4.6.0
+
+# Windows Environment
+pywin32>=305; sys_platform == "win32"
+
+# Database
+sqlite3  # Built-in Python module
+
+# Logging & Utilities
+colorlog>=6.7.0
