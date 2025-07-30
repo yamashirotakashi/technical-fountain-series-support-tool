@@ -202,10 +202,16 @@ class PDFOverflowProcessor:
                 self.logger.info(f"検出ページ: {overflow_page_numbers}")
             
             # PDFの総ページ数を取得
-            import PyPDF2
-            with open(pdf_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                total_pages = len(reader.pages)
+            try:
+                import pypdf
+                with open(pdf_path, 'rb') as file:
+                    reader = pypdf.PdfReader(file)
+                    total_pages = len(reader.pages)
+            except ImportError:
+                import PyPDF2
+                with open(pdf_path, 'rb') as file:
+                    reader = PyPDF2.PdfReader(file)
+                    total_pages = len(reader.pages)
             
             # 検出結果を辞書形式に変換
             overflow_pages = []
@@ -233,10 +239,16 @@ class PDFOverflowProcessor:
     def _get_total_pages_fallback(self, pdf_path: Path) -> int:
         """総ページ数の取得（フォールバック）"""
         try:
-            import PyPDF2
-            with open(pdf_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                return len(reader.pages)
+            try:
+                import pypdf
+                with open(pdf_path, 'rb') as file:
+                    reader = pypdf.PdfReader(file)
+                    return len(reader.pages)
+            except ImportError:
+                import PyPDF2
+                with open(pdf_path, 'rb') as file:
+                    reader = PyPDF2.PdfReader(file)
+                    return len(reader.pages)
         except Exception as e:
             self.logger.warning(f"総ページ数取得失敗: {e}")
             return 0
@@ -271,11 +283,18 @@ class PDFOverflowProcessor:
             
             # PDFファイルとしての妥当性確認
             try:
-                import PyPDF2
-                with open(pdf_path, 'rb') as file:
-                    reader = PyPDF2.PdfReader(file)
-                    if len(reader.pages) == 0:
-                        return False, "PDFにページが含まれていません"
+                try:
+                    import pypdf
+                    with open(pdf_path, 'rb') as file:
+                        reader = pypdf.PdfReader(file)
+                        if len(reader.pages) == 0:
+                            return False, "PDFにページが含まれていません"
+                except ImportError:
+                    import PyPDF2
+                    with open(pdf_path, 'rb') as file:
+                        reader = PyPDF2.PdfReader(file)
+                        if len(reader.pages) == 0:
+                            return False, "PDFにページが含まれていません"
             except Exception as e:
                 return False, f"PDFファイルが破損している可能性があります: {str(e)}"
             

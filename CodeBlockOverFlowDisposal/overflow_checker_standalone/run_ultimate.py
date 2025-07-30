@@ -45,19 +45,38 @@ if sys.platform == 'win32':
 def load_module_with_namespace(module_name, file_path, namespace_aliases=None):
     """名前空間エイリアス付きモジュール読み込み"""
     if module_name not in sys.modules:
-        spec = importlib.util.spec_from_file_location(module_name, file_path)
-        module = importlib.util.module_from_spec(spec)
+        # PyInstallerでパッケージ化されている場合は直接インポートを試行
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            try:
+                # パッケージ化されている場合は通常のインポートを試行
+                if namespace_aliases:
+                    for alias in namespace_aliases:
+                        try:
+                            module = __import__(alias, fromlist=[''])
+                            sys.modules[module_name] = module
+                            return module
+                        except ImportError:
+                            continue
+            except ImportError:
+                pass
         
-        # メインの名前で登録
-        sys.modules[module_name] = module
-        
-        # 名前空間エイリアスも登録
-        if namespace_aliases:
-            for alias in namespace_aliases:
-                sys.modules[alias] = module
-        
-        spec.loader.exec_module(module)
-        return module
+        # 通常のファイルベースロード
+        if os.path.exists(file_path):
+            spec = importlib.util.spec_from_file_location(module_name, file_path)
+            module = importlib.util.module_from_spec(spec)
+            
+            # メインの名前で登録
+            sys.modules[module_name] = module
+            
+            # 名前空間エイリアスも登録
+            if namespace_aliases:
+                for alias in namespace_aliases:
+                    sys.modules[alias] = module
+            
+            spec.loader.exec_module(module)
+            return module
+        else:
+            raise ImportError(f"Module file not found: {file_path}")
     else:
         return sys.modules[module_name]
 
@@ -88,7 +107,7 @@ def main():
     
     # ログ設定をインポート
     sys.path.insert(0, str(script_dir / 'utils'))
-    from logging_config import configure_logging
+    from utils.logging_config import configure_logging
     configure_logging()
     
     try:

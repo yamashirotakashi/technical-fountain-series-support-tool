@@ -1,24 +1,32 @@
 # 独立版溢れチェッカー - 依存関係
-# Windows PowerShell環境対応
+# Windows PowerShell環境対応（EXE化対応版）
 
 # GUI Framework
-PyQt6>=6.4.0
+PyQt6>=6.9.0
+PyQt6-Qt6>=6.9.0
 
 # PDF Processing
-PyPDF2>=3.0.1
-Pillow>=9.3.0
-PyMuPDF>=1.23.8
-pdfplumber>=0.9.0
+PyMuPDF>=1.24.0
+pdfplumber>=0.11.0
+pypdfium2>=4.18.0
 
-# OCR
-pytesseract>=0.3.10
-opencv-python>=4.6.0
+# Image Processing & OCR
+Pillow>=10.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+pytesseract>=0.3.13
 
-# Image Processing
-numpy>=1.21.0
+# Windows Environment & EXE化
+pywin32>=306; sys_platform == "win32"
+pyinstaller>=6.0.0; sys_platform == "win32"
 
-# Windows Environment
-pywin32>=305; sys_platform == "win32"
+# Data Processing
+packaging>=21.3
+charset-normalizer>=3.0.0
+cryptography>=41.0.0
+
+# Database
+# Note: sqlite3 is included in Python standard library
 
 # Logging & Utilities
 colorlog>=6.7.0
