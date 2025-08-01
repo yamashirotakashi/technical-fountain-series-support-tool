@@ -1,0 +1,47 @@
+# 技術の泉シリーズプロジェクト初期化ツール - EXE版依存関係
+# Windows環境でのEXE化に必要なパッケージ
+
+# GUI関連
+PyQt6>=6.6.0
+qasync>=0.27.0
+
+# HTTP/API関連
+aiohttp>=3.9.0
+slack-sdk>=3.26.0
+
+# Google APIs
+google-api-python-client>=2.110.0
+google-auth-httplib2>=0.2.0
+google-auth-oauthlib>=1.2.0
+google-auth>=2.25.0
+
+# 環境変数管理
+python-dotenv>=1.0.0
+
+# EXE化関連
+pyinstaller>=6.3.0
+auto-py-to-exe>=2.43.0
+
+# Windows固有の依存関係
+pywin32>=306; sys_platform == "win32"
+pypiwin32>=223; sys_platform == "win32"
+
+# セキュリティとHTTPS対応
+certifi>=2023.11.17
+urllib3>=2.1.0
+requests>=2.31.0
+
+# 日時処理
+pytz>=2023.3
+
+# JSON処理
+jsonschema>=4.20.0
+
+# ログ処理
+colorama>=0.4.6
+
+# 並行処理サポート
+asyncio-mqtt>=0.16.1
+
+# データ処理
+typing-extensions>=4.8.0

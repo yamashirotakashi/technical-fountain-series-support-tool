@@ -1,0 +1,30 @@
+# TechImgFile v0.5 Dependencies
+# 作成日: 2025-08-01
+
+# Qt6 GUI Framework
+PyQt6>=6.4.0
+
+# 画像処理
+Pillow>=9.0.0
+
+# HTTP/Web API
+requests>=2.28.0
+
+# Google APIs
+google-api-python-client>=2.50.0
+google-auth-httplib2>=0.1.0
+google-auth-oauthlib>=0.5.0
+
+# Git操作
+GitPython>=3.1.0
+
+# テスト
+pytest>=7.0.0
+pytest-qt>=4.2.0
+
+# EXE化
+pyinstaller>=5.0.0
+
+# ユーティリティ
+python-dotenv>=0.19.0
+pyyaml>=6.0

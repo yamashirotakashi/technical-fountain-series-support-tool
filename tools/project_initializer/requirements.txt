@@ -1,0 +1,35 @@
+# Project Initializer Requirements
+
+# GUI Framework
+PyQt6>=6.5.0
+PyQt6-Qt6>=6.5.0
+
+# Google APIs
+google-api-python-client>=2.100.0
+google-auth>=2.23.0
+google-auth-oauthlib>=1.1.0
+google-auth-httplib2>=0.1.1
+
+# Slack SDK
+slack-sdk>=3.26.0
+aiohttp>=3.9.0
+
+# GitHub API
+PyGithub>=2.1.1  # 追加オプション（将来用）
+
+# Async Support
+asyncio>=3.4.3
+qasync>=0.27.0  # Qt6対応のasyncio統合（asyncqtの代替）
+# asyncqt>=0.8.0  # Windows環境で問題があるためqasyncを使用
+
+# Environment
+python-dotenv>=1.0.0
+
+# Logging
+coloredlogs>=15.0.1
+
+# Build Tools (for EXE)
+pyinstaller>=6.0.0
+
+# Utils
+pydantic>=2.5.0  # 設定管理用

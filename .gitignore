@@ -56,3 +56,21 @@ dist/
 *.egg-info/
 GITIGNORE_END < /dev/null
 test_venv/
+
+# Credentials and sensitive files
+config/service_account.json
+tools/project_initializer/config/service_account.json
+**/service_account.json
+
+# Test files with credentials
+tools/project_initializer/check_workspace.py
+tools/project_initializer/list_channels.py
+tools/project_initializer/test_channel_access.py
+tools/project_initializer/test_slack.py
+tools/project_initializer/check_user_token_scopes.py
+
+# Quality reports
+.quality_reports/
+
+# Backup directories
+*.backup_*
