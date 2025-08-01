@@ -224,7 +224,20 @@ class ApiProcessor(QObject):
                 self.log_message.emit(f"ステータス確認 - HTTP Status: {response.status_code}", "DEBUG")
                 
                 if response.status_code == 200:
-                    data = response.json()
+                    # レスポンスの内容を確認
+                    try:
+                        response_text = response.text
+                        self.log_message.emit(f"レスポンス内容: {response_text[:500]}", "DEBUG")
+                        data = response.json()
+                    except Exception as e:
+                        self.log_message.emit(f"JSONパースエラー: {str(e)}", "ERROR")
+                        self.log_message.emit(f"レスポンス内容: {response.text[:500]}", "ERROR")
+                        # 空のレスポンスの場合は処理中として扱う
+                        if not response.text:
+                            self.log_message.emit("空のレスポンスを受信 - 処理中として継続", "INFO")
+                            time.sleep(self.POLLING_INTERVAL)
+                            continue
+                        raise
                     self.log_message.emit(f"ステータス応答全体: {data}", "DEBUG")
                     
                     status = data.get('status', 'unknown')
