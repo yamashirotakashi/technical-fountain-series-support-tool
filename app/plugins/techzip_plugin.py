@@ -23,6 +23,7 @@ class TechZipPlugin(BasePlugin):
         super().__init__()
         self.process = None
         self.process_thread = None
+        self.logger.info("TechZipプラグインが初期化されました")
         
     def _get_metadata(self) -> PluginMetadata:
         """プラグインのメタデータを返す"""
@@ -32,6 +33,14 @@ class TechZipPlugin(BasePlugin):
             description="Re:VIEWから超原稿用紙（Word）形式への自動変換",
             icon_path="assets/icons/techzip.png"
         )
+        
+    def _get_default_config(self) -> Dict[str, Any]:
+        """デフォルト設定"""
+        return {
+            "auto_start": False,
+            "window_size": [1200, 800],
+            "default_mode": "standalone"
+        }
         
     def launch(self, config: Dict[str, Any]) -> bool:
         """
@@ -46,6 +55,7 @@ class TechZipPlugin(BasePlugin):
             起動成功フラグ
         """
         try:
+            self.logger.info(f"TECHZIPを起動します: mode={config.get('mode', 'standalone')}")
             mode = config.get("mode", "standalone")
             
             if mode == "standalone":
@@ -105,6 +115,7 @@ class TechZipPlugin(BasePlugin):
                 )
                 self.process_thread.start()
                 
+            self.logger.info("プラグインが正常に起動しました")
             return True
             
         except Exception as e:

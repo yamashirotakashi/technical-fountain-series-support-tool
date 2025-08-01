@@ -1,0 +1,31 @@
+{
+  "version": "1.0.0",
+  "app": {
+    "theme": "dark",
+    "language": "ja",
+    "auto_update": true,
+    "log_level": "DEBUG"
+  },
+  "paths": {
+    "git_base": "G:\\マイドライブ\\[git]",
+    "output_base": "G:\\.shortcut-targets-by-id\\0B6euJ_grVeOeMnJLU1IyUWgxeWM\\NP-IRD",
+    "cache_dir": "/mnt/c/Users/tky99/DEV/technical-fountain-series-support-tool/cache",
+    "log_dir": "/mnt/c/Users/tky99/DEV/technical-fountain-series-support-tool/logs"
+  },
+  "google": {
+    "sheet_id": "17DKsMGQ6krbhY7GIcX0iaeN-y8HcGGVkXt3d4oOckyQ",
+    "credentials_path": "C:\\Users\\tky99\\dev\\techbookanalytics\\config\\techbook-analytics-aa03914c6639.json"
+  },
+  "email": {
+    "enable_monitoring": true,
+    "check_interval": 60
+  },
+  "plugins": {
+    "enabled": [
+      "TechZipPlugin",
+      "AnalyzerPlugin"
+    ],
+    "auto_start": []
+  },
+  "last_updated": "2025-08-01T22:55:13.476756"
+}

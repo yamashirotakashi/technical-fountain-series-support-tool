@@ -10,3 +10,8 @@ selenium==4.17.2
 psutil>=5.9.0
 beautifulsoup4>=4.12.0
 slack-sdk>=3.27.0
+# TechBook27 Analyzer dependencies
+customtkinter>=5.2.0
+Pillow>=10.0.0
+keyring>=24.0.0
+cryptography>=41.0.0

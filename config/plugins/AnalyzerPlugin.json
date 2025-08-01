@@ -1,0 +1,9 @@
+{
+  "auto_start": false,
+  "window_size": [
+    1000,
+    700
+  ],
+  "default_mode": "standalone",
+  "processing_threads": 4
+}
