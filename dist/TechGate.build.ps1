@@ -2,7 +2,7 @@
 # PyInstaller使用 - 標準規則準拠
 
 param(
-    [string]$Version = "0.5",
+    [string]$Version = "0.6",
     [switch]$Clean = $false,
     [switch]$Debug = $false,
     [switch]$SkipTests = $false
@@ -102,8 +102,8 @@ function New-VersionInfo {
     $versionInfoContent = @"
 VSVersionInfo(
     ffi=FixedFileInfo(
-        filevers=(0, 5, 0, 0),
-        prodvers=(0, 5, 0, 0),
+        filevers=(0, 6, 0, 0),
+        prodvers=(0, 6, 0, 0),
         mask=0x3f,
         flags=0x0,
         OS=0x4,
@@ -117,12 +117,12 @@ VSVersionInfo(
                 u'040904B0',
                 [
                 StringStruct(u'CompanyName', u'Claude Code Assistant'),
-                StringStruct(u'FileDescription', u'TechGate 3ツール統合ランチャー'),
+                StringStruct(u'FileDescription', u'TechGate 4ツール統合ランチャー'),
                 StringStruct(u'FileVersion', u'$Version'),
                 StringStruct(u'InternalName', u'TechGate'),
                 StringStruct(u'LegalCopyright', u'© 2025 Claude Code Assistant'),
                 StringStruct(u'OriginalFilename', u'TechGate.$Version.exe'),
-                StringStruct(u'ProductName', u'TechGate統合ランチャー'),
+                StringStruct(u'ProductName', u'TechGate 4ツール統合ランチャー'),
                 StringStruct(u'ProductVersion', u'$Version')
                 ]
             )
@@ -139,9 +139,59 @@ VSVersionInfo(
     return $versionInfoPath
 }
 
-# PyInstallerでEXE化
+# Windows Defender対応チェック
+function Test-WindowsDefenderIssue {
+    Write-Host "Windows Defender設定をチェック中..." -ForegroundColor Yellow
+    
+    # 現在のプロジェクトディレクトリが除外リストに含まれているかチェック
+    try {
+        $exclusions = Get-MpPreference | Select-Object -ExpandProperty ExclusionPath
+        $currentPath = $ProjectRoot.ToLower()
+        
+        $isExcluded = $exclusions | Where-Object { $_.ToLower() -eq $currentPath }
+        
+        if (-not $isExcluded) {
+            Write-Host "[WARNING] プロジェクトディレクトリがWindows Defenderの除外リストに含まれていません" -ForegroundColor Red
+            Write-Host "このため、PyInstallerの実行中にWindows Defenderによってブロックされる可能性があります" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "解決方法:" -ForegroundColor Cyan
+            Write-Host "1. 管理者権限でPowerShellを開く" -ForegroundColor White
+            Write-Host "2. 以下のコマンドを実行:" -ForegroundColor White
+            Write-Host "   Add-MpPreference -ExclusionPath `"$ProjectRoot`"" -ForegroundColor Gray
+            Write-Host "または" -ForegroundColor Cyan
+            Write-Host "Windows Security → ウイルスと脅威の防止 → 設定の管理 → 除外の追加または削除" -ForegroundColor White
+            Write-Host "でフォルダを除外リストに追加してください" -ForegroundColor White
+            Write-Host ""
+            
+            $continue = Read-Host "除外設定後に続行しますか？ (y/N)"
+            if ($continue -ne "y" -and $continue -ne "Y") {
+                return $false
+            }
+        } else {
+            Write-Host "[OK] プロジェクトディレクトリはWindows Defenderの除外リストに含まれています" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "[WARNING] Windows Defender設定の確認に失敗しました: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "管理者権限が必要な可能性があります" -ForegroundColor Yellow
+        
+        $continue = Read-Host "続行しますか？ (y/N)"
+        if ($continue -ne "y" -and $continue -ne "Y") {
+            return $false
+        }
+    }
+    
+    return $true
+}
+
+# PyInstallerでEXE化（Defender対応版）
 function Build-Executable {
     Write-Host "PyInstallerでEXE化中（フォルダ構成）..." -ForegroundColor Yellow
+    
+    # Windows Defender対応チェック
+    if (-not (Test-WindowsDefenderIssue)) {
+        Write-Host "[ERROR] Windows Defender設定を確認してください" -ForegroundColor Red
+        return $false
+    }
     
     # ビルドオプション（標準規則準拠）
     $launcherScript = Join-Path $ProjectRoot "src" "TechGate.py"
@@ -167,21 +217,40 @@ function Build-Executable {
     
     Write-Host "フォルダ構成モードでビルド（高速起動対応）" -ForegroundColor Green
     
-    # PyInstaller実行
+    # PyInstaller実行（Defender対応）
     try {
         Push-Location $DistPath
         
         Write-Host "PyInstaller実行中..." -ForegroundColor Cyan
         Write-Host "コマンド: pyinstaller $($buildArgs -join ' ')" -ForegroundColor Gray
+        Write-Host "注意: Windows Defenderによりブロックされる可能性があります" -ForegroundColor Yellow
         
-        & pyinstaller @buildArgs
+        # PyInstaller実行とエラーハンドリング
+        $output = & pyinstaller @buildArgs 2>&1
         
         if ($LASTEXITCODE -ne 0) {
-            throw "PyInstaller実行に失敗しました (終了コード: $LASTEXITCODE)"
+            # Windows Defenderエラーの特定
+            $defenderError = $output | Where-Object { $_ -match "ウイルス|virus|threat|blocked|225" }
+            if ($defenderError) {
+                Write-Host "[ERROR] Windows Defenderによってブロックされました" -ForegroundColor Red
+                Write-Host "詳細エラー: $defenderError" -ForegroundColor Red
+                Write-Host ""
+                Write-Host "解決方法:" -ForegroundColor Cyan
+                Write-Host "1. Windows Security → ウイルスと脅威の防止" -ForegroundColor White
+                Write-Host "2. 設定の管理 → 除外の追加または削除" -ForegroundColor White
+                Write-Host "3. フォルダを追加: $ProjectRoot" -ForegroundColor White
+                Write-Host "4. または管理者権限で以下を実行:" -ForegroundColor White
+                Write-Host "   Add-MpPreference -ExclusionPath `"$ProjectRoot`"" -ForegroundColor Gray
+                throw "Windows Defenderによる実行ブロック"
+            } else {
+                throw "PyInstaller実行に失敗しました (終了コード: $LASTEXITCODE)"
+            }
         }
         
     } catch {
         Write-Host "[ERROR] EXE化に失敗しました: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "PyInstaller出力:" -ForegroundColor Yellow
+        $output | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
         return $false
     } finally {
         Pop-Location

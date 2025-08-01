@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-TechGate - 3ツール統合ランチャー
+TechGate - 4ツール統合ランチャー
 バージョン自動検出対応統合ランチャー
+v0.6 - TechDisposal統合対応
 """
 
 import sys
@@ -42,6 +43,10 @@ class VersionDetector:
                 "folder_pattern": r"PJinit\.(\d+\.\d+)",
                 "exe_pattern": r"PJinit\.(\d+\.\d+)\.exe"
             },
+            "techdisposal": {
+                "folder_pattern": r"TechDisposal\.(\d+\.\d+)",
+                "exe_pattern": r"TechDisposal\.(\d+\.\d+)\.exe"
+            },
             "techzip": {
                 "folder_pattern": r"TECHZIP\.(\d+\.\d+)",
                 "exe_pattern": r"TECHZIP\.(\d+\.\d+)\.exe"
@@ -55,6 +60,7 @@ class VersionDetector:
     def detect_all_versions(self) -> Dict[str, ToolInfo]:
         tools = {
             "pjinit": ToolInfo("pjinit", "[PJ] PJinit", "プロジェクト初期化", "PJinit", "[PJ]"),
+            "techdisposal": ToolInfo("techdisposal", "[IMG] TechDisposal", "画像・文書処理", "TechDisposal", "[IMG]"),
             "techzip": ToolInfo("techzip", "[ZIP] TECHZIP", "Re:VIEW → Word変換", "TECHZIP", "[ZIP]"),
             "overflow": ToolInfo("overflow", "[CHK] はみ出し分析", "PDF品質チェック", "OverflowChecker", "[CHK]")
         }
@@ -79,6 +85,8 @@ class VersionDetector:
                 
                 if tool_id == "overflow":
                     exe_path = item / "OverflowChecker.exe"
+                elif tool_id == "techdisposal":
+                    exe_path = item / f"TechDisposal.{version}.exe"
                 else:
                     exe_path = item / f"{tool_info.base_path}.{version}.exe"
                 
@@ -158,7 +166,7 @@ class TechGateGUI(QMainWindow):
         self.detect_tools()
     
     def setup_ui(self):
-        self.setWindowTitle("TechGate v0.5 - 3ツール統合ランチャー")
+        self.setWindowTitle("TechGate v0.6 - 4ツール統合ランチャー")
         self.setGeometry(150, 150, 900, 700)
         
         central_widget = QWidget()
@@ -188,7 +196,7 @@ class TechGateGUI(QMainWindow):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title)
         
-        subtitle = QLabel("3ツール統合ランチャー（バージョン自動検出対応）")
+        subtitle = QLabel("4ツール統合ランチャー（バージョン自動検出対応）")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setStyleSheet("color: gray; font-size: 12px;")
         header_layout.addWidget(subtitle)

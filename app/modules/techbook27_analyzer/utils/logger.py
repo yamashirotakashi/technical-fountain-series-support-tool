@@ -13,7 +13,7 @@ from logging.handlers import RotatingFileHandler
 class LoggerManager:
     """ログ管理クラス"""
     
-    def __init__(self, app_name: str = "TechBook27Analyzer", 
+    def __init__(self, app_name: str = "TechDisposalAnalyzer", 
                  log_dir: Optional[str] = None):
         """
         Args:
@@ -134,7 +134,7 @@ class LoggerManager:
 _logger_manager = LoggerManager()
 
 
-def setup_logging(app_name: str = "TechBook27Analyzer", 
+def setup_logging(app_name: str = "TechDisposalAnalyzer", 
                   log_level: str = "INFO",
                   log_dir: Optional[str] = None) -> logging.Logger:
     """

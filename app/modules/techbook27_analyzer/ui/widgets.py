@@ -1,227 +1,348 @@
 """
-カスタムウィジェット
+Qt6カスタムウィジェット
 単一責任: 再利用可能なUI部品の提供
 """
-import customtkinter as ctk
-import tkinter as tk
 import queue
 import time
 from typing import Optional, List, Callable
 from threading import Thread
+from pathlib import Path
+
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
+    QTextEdit, QLineEdit, QFileDialog, QProgressBar, QDialog,
+    QCheckBox, QSpinBox, QComboBox, QFrame
+)
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
+from PyQt6.QtGui import QFont, QTextCursor
 
 
-class ScrollableTextOutput(ctk.CTkTextbox):
+class ScrollableTextOutput(QTextEdit):
     """スクロール可能なテキスト出力ウィジェット"""
     
-    def __init__(self, master, **kwargs):
-        """
+    def __init__(self, parent: Optional[QWidget] = None):
+        """初期化
+        
         Args:
-            master: 親ウィジェット
-            **kwargs: CTkTextboxの追加引数
+            parent: 親ウィジェット
         """
-        super().__init__(master, **kwargs)
-        self.configure(state="disabled")
+        super().__init__(parent)
+        self.setReadOnly(True)
+        self.setFont(QFont("Consolas", 9))
         
         # メッセージキュー
         self.message_queue = queue.Queue()
         
-        # キュー処理を開始
-        self.after(100, self._process_queue)
-        
-    def append(self, text: str, timestamp: bool = True) -> None:
-        """
-        テキストを追加
+        # タイマーでキューを処理
+        self.timer = QTimer()
+        self.timer.timeout.connect(self._process_queue)
+        self.timer.start(100)  # 100ms間隔
+    
+    def add_message(self, message: str, auto_scroll: bool = True):
+        """メッセージを追加
         
         Args:
-            text: 追加するテキスト
-            timestamp: タイムスタンプを付けるか
+            message: 追加するメッセージ
+            auto_scroll: 自動スクロールするか
         """
-        if timestamp:
-            formatted_text = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {text}"
-        else:
-            formatted_text = text
-            
-        self.message_queue.put(formatted_text)
-        
-    def clear(self) -> None:
-        """テキストをクリア"""
-        self.configure(state="normal")
-        self.delete("1.0", "end")
-        self.configure(state="disabled")
-        
-    def _process_queue(self) -> None:
-        """キュー内のメッセージを処理"""
+        self.message_queue.put((message, auto_scroll))
+    
+    def _process_queue(self):
+        """キューからメッセージを処理"""
         try:
-            while True:
-                text = self.message_queue.get_nowait()
-                self.configure(state="normal")
-                self.insert("end", text + "\n")
-                self.configure(state="disabled")
-                self.see("end")
+            while not self.message_queue.empty():
+                message, auto_scroll = self.message_queue.get_nowait()
+                
+                # カーソルを末尾に移動
+                cursor = self.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                self.setTextCursor(cursor)
+                
+                # メッセージを追加
+                self.insertPlainText(f"{message}\n")
+                
+                if auto_scroll:
+                    # 最後の行にスクロール
+                    scrollbar = self.verticalScrollBar()
+                    scrollbar.setValue(scrollbar.maximum())
+                    
         except queue.Empty:
             pass
-        finally:
-            self.after(100, self._process_queue)
+    
+    def clear_output(self):
+        """出力をクリア"""
+        self.clear()
 
 
-class FileSelector(ctk.CTkFrame):
+class FileSelector(QWidget):
     """ファイル選択ウィジェット"""
     
-    def __init__(self, master, label: str = "ファイル:", 
-                 file_types: Optional[List[tuple]] = None,
-                 command: Optional[Callable] = None, **kwargs):
-        """
-        Args:
-            master: 親ウィジェット
-            label: ラベルテキスト
-            file_types: ファイルタイプのリスト
-            command: 選択時のコールバック
-            **kwargs: CTkFrameの追加引数
-        """
-        super().__init__(master, **kwargs)
+    file_selected = pyqtSignal(str)  # ファイルが選択された時のシグナル
+    
+    def __init__(self, label_text: str = "ファイル選択:", 
+                 file_filter: str = "All Files (*)", parent: Optional[QWidget] = None):
+        """初期化
         
-        self.file_types = file_types or [("All files", "*.*")]
-        self.command = command
+        Args:
+            label_text: ラベルテキスト
+            file_filter: ファイルフィルタ
+            parent: 親ウィジェット
+        """
+        super().__init__(parent)
+        self.file_filter = file_filter
+        
+        # レイアウト作成
+        layout = QHBoxLayout(self)
         
         # ラベル
-        self.label = ctk.CTkLabel(self, text=label)
-        self.label.pack(side=tk.LEFT, padx=5)
+        self.label = QLabel(label_text)
+        layout.addWidget(self.label)
         
-        # エントリー
-        self.var = ctk.StringVar()
-        self.entry = ctk.CTkEntry(self, textvariable=self.var, width=300)
-        self.entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        # パス表示
+        self.path_edit = QLineEdit()
+        self.path_edit.setReadOnly(True)
+        layout.addWidget(self.path_edit)
         
-        # 参照ボタン
-        self.browse_button = ctk.CTkButton(
-            self, text="参照", command=self._browse, width=80
-        )
-        self.browse_button.pack(side=tk.LEFT, padx=5)
-        
-    def _browse(self) -> None:
+        # 選択ボタン
+        self.browse_btn = QPushButton("参照...")
+        self.browse_btn.clicked.connect(self._select_file)
+        layout.addWidget(self.browse_btn)
+    
+    def _select_file(self):
         """ファイル選択ダイアログを表示"""
-        file_path = ctk.filedialog.askopenfilename(filetypes=self.file_types)
-        if file_path:
-            self.var.set(file_path)
-            if self.command:
-                self.command(file_path)
-                
-    def get_path(self) -> str:
-        """選択されたパスを取得"""
-        return self.var.get()
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "ファイルを選択", "", self.file_filter
+        )
         
-    def set_path(self, path: str) -> None:
-        """パスを設定"""
-        self.var.set(path)
+        if file_path:
+            self.path_edit.setText(file_path)
+            self.file_selected.emit(file_path)
+    
+    def get_file_path(self) -> str:
+        """選択されたファイルパスを取得"""
+        return self.path_edit.text()
+    
+    def set_file_path(self, path: str):
+        """ファイルパスを設定"""
+        self.path_edit.setText(path)
 
 
-class FolderSelector(ctk.CTkFrame):
+class FolderSelector(QWidget):
     """フォルダ選択ウィジェット"""
     
-    def __init__(self, master, label: str = "フォルダ:", 
-                 command: Optional[Callable] = None, **kwargs):
-        """
-        Args:
-            master: 親ウィジェット
-            label: ラベルテキスト
-            command: 選択時のコールバック
-            **kwargs: CTkFrameの追加引数
-        """
-        super().__init__(master, **kwargs)
-        
-        self.command = command
-        
-        # ラベル
-        self.label = ctk.CTkLabel(self, text=label)
-        self.label.pack(side=tk.LEFT, padx=5)
-        
-        # エントリー
-        self.var = ctk.StringVar()
-        self.entry = ctk.CTkEntry(self, textvariable=self.var, width=300)
-        self.entry.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
-        
-        # 参照ボタン
-        self.browse_button = ctk.CTkButton(
-            self, text="参照", command=self._browse, width=80
-        )
-        self.browse_button.pack(side=tk.LEFT, padx=5)
-        
-    def _browse(self) -> None:
-        """フォルダ選択ダイアログを表示"""
-        folder_path = ctk.filedialog.askdirectory()
-        if folder_path:
-            self.var.set(folder_path)
-            if self.command:
-                self.command(folder_path)
-                
-    def get_path(self) -> str:
-        """選択されたパスを取得"""
-        return self.var.get()
-        
-    def set_path(self, path: str) -> None:
-        """パスを設定"""
-        self.var.set(path)
-
-
-class ProgressDialog(ctk.CTkToplevel):
-    """進捗ダイアログ"""
+    folder_selected = pyqtSignal(str)  # フォルダが選択された時のシグナル
     
-    def __init__(self, parent, title: str = "処理中...", 
-                 message: str = "処理を実行しています"):
-        """
+    def __init__(self, label_text: str = "フォルダ選択:", parent: Optional[QWidget] = None):
+        """初期化
+        
         Args:
-            parent: 親ウィンドウ
-            title: ダイアログタイトル
-            message: メッセージ
+            label_text: ラベルテキスト
+            parent: 親ウィジェット
         """
         super().__init__(parent)
         
-        self.title(title)
-        self.geometry("400x150")
-        self.resizable(False, False)
+        # レイアウト作成
+        layout = QHBoxLayout(self)
         
-        # モーダルにする
-        self.transient(parent)
-        self.grab_set()
+        # ラベル
+        self.label = QLabel(label_text)
+        layout.addWidget(self.label)
         
-        # メッセージラベル
-        self.message_label = ctk.CTkLabel(
-            self, text=message, 
-            font=ctk.CTkFont(size=14)
+        # パス表示
+        self.path_edit = QLineEdit()
+        self.path_edit.setReadOnly(True)
+        layout.addWidget(self.path_edit)
+        
+        # 選択ボタン
+        self.browse_btn = QPushButton("参照...")
+        self.browse_btn.clicked.connect(self._select_folder)
+        layout.addWidget(self.browse_btn)
+    
+    def _select_folder(self):
+        """フォルダ選択ダイアログを表示"""
+        folder_path = QFileDialog.getExistingDirectory(
+            self, "フォルダを選択"
         )
-        self.message_label.pack(pady=20)
         
-        # プログレスバー
-        self.progress = ctk.CTkProgressBar(self, width=350)
-        self.progress.pack(pady=10)
-        self.progress.set(0)
-        
-        # キャンセルボタン
-        self.cancel_button = ctk.CTkButton(
-            self, text="キャンセル", command=self.cancel
-        )
-        self.cancel_button.pack(pady=10)
-        
-        self.cancelled = False
-        
-    def update_progress(self, value: float, message: Optional[str] = None) -> None:
-        """
-        進捗を更新
+        if folder_path:
+            self.path_edit.setText(folder_path)
+            self.folder_selected.emit(folder_path)
+    
+    def get_folder_path(self) -> str:
+        """選択されたフォルダパスを取得"""
+        return self.path_edit.text()
+    
+    def set_folder_path(self, path: str):
+        """フォルダパスを設定"""
+        self.path_edit.setText(path)
+
+
+class ProgressDialog(QDialog):
+    """プログレスダイアログ"""
+    
+    cancel_requested = pyqtSignal()  # キャンセルが要求された時のシグナル
+    
+    def __init__(self, title: str = "処理中...", parent: Optional[QWidget] = None):
+        """初期化
         
         Args:
-            value: 進捗値（0.0〜1.0）
-            message: メッセージ（オプション）
+            title: ダイアログタイトル
+            parent: 親ウィジェット
         """
-        self.progress.set(value)
-        if message:
-            self.message_label.configure(text=message)
-        self.update()
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.setFixedSize(400, 120)
         
-    def cancel(self) -> None:
+        # レイアウト作成
+        layout = QVBoxLayout(self)
+        
+        # ステータスラベル
+        self.status_label = QLabel("処理を開始しています...")
+        layout.addWidget(self.status_label)
+        
+        # プログレスバー
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        layout.addWidget(self.progress_bar)
+        
+        # キャンセルボタン
+        self.cancel_btn = QPushButton("キャンセル")
+        self.cancel_btn.clicked.connect(self._on_cancel)
+        layout.addWidget(self.cancel_btn)
+        
+        # フラグ
+        self.is_cancelled = False
+    
+    def _on_cancel(self):
         """キャンセル処理"""
-        self.cancelled = True
-        self.destroy()
+        self.is_cancelled = True
+        self.cancel_requested.emit()
+        self.status_label.setText("キャンセル中...")
+        self.cancel_btn.setEnabled(False)
+    
+    def update_progress(self, value: int, status: str = ""):
+        """プログレスを更新
         
-    def is_cancelled(self) -> bool:
-        """キャンセルされたか確認"""
-        return self.cancelled
+        Args:
+            value: 進捗値（0-100）
+            status: ステータスメッセージ
+        """
+        self.progress_bar.setValue(value)
+        if status:
+            self.status_label.setText(status)
+    
+    def set_completed(self, message: str = "処理が完了しました"):
+        """完了状態に設定"""
+        self.progress_bar.setValue(100)
+        self.status_label.setText(message)
+        self.cancel_btn.setText("閉じる")
+        self.cancel_btn.clicked.disconnect()
+        self.cancel_btn.clicked.connect(self.accept)
+        self.cancel_btn.setEnabled(True)
+
+
+class OptionsPanel(QFrame):
+    """オプションパネル"""
+    
+    def __init__(self, parent: Optional[QWidget] = None):
+        """初期化"""
+        super().__init__(parent)
+        self.setFrameStyle(QFrame.Shape.StyledPanel)
+        
+        # メインレイアウト
+        self.layout = QVBoxLayout(self)
+        
+        # オプション辞書
+        self.options = {}
+    
+    def add_checkbox(self, key: str, text: str, default: bool = False) -> QCheckBox:
+        """チェックボックスを追加
+        
+        Args:
+            key: オプションキー
+            text: 表示テキスト
+            default: デフォルト値
+            
+        Returns:
+            作成されたQCheckBox
+        """
+        checkbox = QCheckBox(text)
+        checkbox.setChecked(default)
+        checkbox.stateChanged.connect(lambda state, k=key: self._update_option(k, state == Qt.CheckState.Checked))
+        self.layout.addWidget(checkbox)
+        self.options[key] = checkbox
+        return checkbox
+    
+    def add_spinbox(self, key: str, label: str, default: int = 0, 
+                   min_val: int = 0, max_val: int = 1000) -> QSpinBox:
+        """スピンボックスを追加
+        
+        Args:
+            key: オプションキー
+            label: ラベルテキスト
+            default: デフォルト値
+            min_val: 最小値
+            max_val: 最大値
+            
+        Returns:
+            作成されたQSpinBox
+        """
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        
+        layout.addWidget(QLabel(label))
+        
+        spinbox = QSpinBox()
+        spinbox.setRange(min_val, max_val)
+        spinbox.setValue(default)
+        spinbox.valueChanged.connect(lambda value, k=key: self._update_option(k, value))
+        layout.addWidget(spinbox)
+        
+        self.layout.addWidget(container)
+        self.options[key] = spinbox
+        return spinbox
+    
+    def add_combobox(self, key: str, label: str, items: List[str], default: int = 0) -> QComboBox:
+        """コンボボックスを追加
+        
+        Args:
+            key: オプションキー
+            label: ラベルテキスト
+            items: アイテムリスト
+            default: デフォルトインデックス
+            
+        Returns:
+            作成されたQComboBox
+        """
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        
+        layout.addWidget(QLabel(label))
+        
+        combobox = QComboBox()
+        combobox.addItems(items)
+        combobox.setCurrentIndex(default)
+        combobox.currentTextChanged.connect(lambda text, k=key: self._update_option(k, text))
+        layout.addWidget(combobox)
+        
+        self.layout.addWidget(container)
+        self.options[key] = combobox
+        return combobox
+    
+    def _update_option(self, key: str, value):
+        """オプション値を更新"""
+        # 実際の値の更新は親クラスで処理
+        pass
+    
+    def get_values(self) -> dict:
+        """現在の値を取得"""
+        values = {}
+        for key, widget in self.options.items():
+            if isinstance(widget, QCheckBox):
+                values[key] = widget.isChecked()
+            elif isinstance(widget, QSpinBox):
+                values[key] = widget.value()
+            elif isinstance(widget, QComboBox):
+                values[key] = widget.currentText()
+        return values
