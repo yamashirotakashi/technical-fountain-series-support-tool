@@ -41,7 +41,7 @@ class GoogleSheetsClient:
         """
         try:
             # シート名とレンジを指定
-            range_name = '2020.10-!A:S'  # A列からS列まで
+            range_name = '2020.10-!A:T'  # A列からT列まで
             
             result = self.sheets.values().get(
                 spreadsheetId=sheet_id,
@@ -55,16 +55,16 @@ class GoogleSheetsClient:
                 if len(row) > 0 and row[0] == n_code:
                     # 列の対応
                     # A(0): Nコード, C(2): リポジトリ名, E(4): 書籍URL(転記先), H(7): 書籍名
-                    # J(9): Slack ID, L(11): GitHub, S(18): メール
+                    # K(10): Slack ID, M(12): GitHub, T(19): メール
                     
                     return {
                         'n_code': row[0] if len(row) > 0 else None,
                         'repository_name': row[2] if len(row) > 2 else None,
                         'book_url': row[4] if len(row) > 4 else None,  # 既存の値
                         'book_title': row[7] if len(row) > 7 else None,  # H列: 書籍名
-                        'slack_user_id': row[9] if len(row) > 9 else None,  # J列
-                        'github_account': row[11] if len(row) > 11 else None,  # L列
-                        'author_email': row[18] if len(row) > 18 else None,  # S列
+                        'slack_user_id': row[10] if len(row) > 10 else None,  # K列
+                        'github_account': row[12] if len(row) > 12 else None,  # M列
+                        'author_email': row[19] if len(row) > 19 else None,  # T列
                         'row_number': i  # 行番号（1ベース）
                     }
             
@@ -150,7 +150,7 @@ class GoogleSheetsClient:
     
     async def update_slack_user_id(self, sheet_id: str, row_number: int, user_id: str) -> bool:
         """
-        J列にSlackユーザーIDを更新
+        K列にSlackユーザーIDを更新
         
         Args:
             sheet_id: 発行計画シートのID
@@ -161,7 +161,7 @@ class GoogleSheetsClient:
             成功時True
         """
         try:
-            update_range = f'2020.10-!J{row_number}'
+            update_range = f'2020.10-!K{row_number}'
             body = {'values': [[user_id]]}
             
             result = self.sheets.values().update(
@@ -209,10 +209,10 @@ class GoogleSheetsClient:
     
     def extract_github_username(self, value: str) -> Optional[str]:
         """
-        L列の値からGitHubユーザー名を抽出
+        M列の値からGitHubユーザー名を抽出
         
         Args:
-            value: L列の値（URLまたはユーザー名）
+            value: M列の値（URLまたはユーザー名）
             
         Returns:
             GitHubユーザー名、無効な場合はNone

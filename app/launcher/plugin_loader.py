@@ -47,23 +47,51 @@ class PluginLoader:
             module_name = file_path.stem
             
             try:
+                # セキュリティ: プラグインファイルの権限チェック
+                # WSL環境では全てのファイルが777権限となるため、WSL環境では権限チェックをスキップ
+                import stat
+                import platform
+                
+                if platform.system() != "Windows" and not any(wsl_indicator in platform.release().lower() for wsl_indicator in ["microsoft", "wsl"]):
+                    file_stat = file_path.stat()
+                    # 書き込み権限を持つのは所有者のみであることを確認
+                    if file_stat.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+                        print(f"セキュリティ警告: プラグインファイルに不適切な権限 ({module_name})")
+                        continue
+                
+                # ホワイトリスト検証
+                allowed_plugins = [
+                    "techzip_plugin", "analyzer_plugin", "base_plugin",
+                    # 将来の拡張用にプラグイン名を追加
+                ]
+                if module_name not in allowed_plugins:
+                    print(f"未承認のプラグイン: {module_name}")
+                    continue
+                
                 # モジュールを動的にインポート
                 spec = importlib.util.spec_from_file_location(
                     f"app.plugins.{module_name}",
                     file_path
                 )
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    sys.modules[f"app.plugins.{module_name}"] = module
-                    spec.loader.exec_module(module)
+                if not spec or not spec.loader:
+                    print(f"プラグインスペック作成失敗: {module_name}")
+                    continue
                     
-                    # BasePluginのサブクラスを探す
-                    for name, obj in inspect.getmembers(module):
-                        if (inspect.isclass(obj) and 
-                            issubclass(obj, BasePlugin) and 
-                            obj != BasePlugin):
-                            self.plugins[name] = obj
-                            discovered.append(name)
+                module = importlib.util.module_from_spec(spec)
+                if not module:
+                    print(f"プラグインモジュール作成失敗: {module_name}")
+                    continue
+                    
+                sys.modules[f"app.plugins.{module_name}"] = module
+                spec.loader.exec_module(module)
+                
+                # BasePluginのサブクラスを探す
+                for name, obj in inspect.getmembers(module):
+                    if (inspect.isclass(obj) and 
+                        issubclass(obj, BasePlugin) and 
+                        obj != BasePlugin):
+                        self.plugins[name] = obj
+                        discovered.append(name)
                             
             except Exception as e:
                 print(f"プラグイン読み込みエラー ({module_name}): {e}")

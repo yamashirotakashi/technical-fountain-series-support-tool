@@ -5,6 +5,7 @@ Phase 1: TechBook27 Analyzer機能をプラグイン化
 from typing import Dict, Any
 import subprocess
 import sys
+import os
 from pathlib import Path
 import threading
 
@@ -50,6 +51,14 @@ class AnalyzerPlugin(BasePlugin):
             if mode == "standalone":
                 # スタンドアロンモード：独立したAnalyzerウィンドウを起動
                 analyzer_main = project_root / "app" / "modules" / "techbook27_analyzer" / "main.py"
+                # パスの正規化とバリデーション
+                analyzer_main = Path(os.path.normpath(str(analyzer_main)))
+                
+                # パスがプロジェクトルート内にあることを確認
+                try:
+                    analyzer_main.relative_to(project_root)
+                except ValueError:
+                    raise ValueError(f"Invalid path: {analyzer_main} is outside project root")
                 
                 if analyzer_main.exists():
                     self.process = subprocess.Popen(
@@ -85,8 +94,12 @@ class AnalyzerPlugin(BasePlugin):
         """統合UIを起動してAnalyzerタブを表示"""
         try:
             # 統合UIを起動（TODO: タブ選択の実装）
+            integrated_ui_path = project_root / "app" / "ui" / "main_window_integrated.py"
+            if not integrated_ui_path.exists():
+                raise FileNotFoundError(f"Integrated UI not found at {integrated_ui_path}")
+            
             self.process = subprocess.Popen(
-                [sys.executable, "app/ui/main_window_integrated.py"],
+                [sys.executable, str(integrated_ui_path)],
                 cwd=project_root,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

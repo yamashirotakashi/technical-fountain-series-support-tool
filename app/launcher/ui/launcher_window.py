@@ -190,16 +190,29 @@ class LauncherWindow(ctk.CTk):
         
         # デフォルト設定で起動
         config = {"mode": "integrated"}
-        success = plugin.launch(config)
+        success = False
+        error_message = None
+        
+        try:
+            success = plugin.launch(config)
+        except Exception as e:
+            error_message = str(e)
+            print(f"プラグイン起動エラー ({plugin.metadata.name}): {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # タイルの状態を更新（成功/失敗に関わらず）
+            plugin_name = plugin.__class__.__name__
+            if plugin_name in self.app_tiles:
+                self.app_tiles[plugin_name].set_running(success)
         
         if success:
             self.update_status(f"{plugin.metadata.name}を起動しました")
-            # タイルの状態を更新
-            plugin_name = plugin.__class__.__name__
-            if plugin_name in self.app_tiles:
-                self.app_tiles[plugin_name].set_running(True)
         else:
-            self.update_status(f"{plugin.metadata.name}の起動に失敗しました")
+            if error_message:
+                self.update_status(f"{plugin.metadata.name}の起動に失敗: {error_message}")
+            else:
+                self.update_status(f"{plugin.metadata.name}の起動に失敗しました")
             
     def show_plugin_settings(self, plugin: BasePlugin):
         """プラグイン設定ダイアログを表示"""

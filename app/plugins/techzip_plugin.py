@@ -5,6 +5,7 @@ Phase 1: 既存のTECHZIP機能をプラグイン化
 from typing import Dict, Any
 import subprocess
 import sys
+import os
 from pathlib import Path
 import threading
 
@@ -49,8 +50,12 @@ class TechZipPlugin(BasePlugin):
             
             if mode == "standalone":
                 # スタンドアロンモード：既存のmain.pyを起動
+                main_py_path = project_root / "main.py"
+                if not main_py_path.exists():
+                    raise FileNotFoundError(f"main.py not found at {main_py_path}")
+                
                 self.process = subprocess.Popen(
-                    [sys.executable, "main.py"],
+                    [sys.executable, str(main_py_path)],
                     cwd=project_root,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -67,8 +72,25 @@ class TechZipPlugin(BasePlugin):
                 
             elif mode == "integrated":
                 # 統合モード：統合UIを起動
+                integrated_ui_path = project_root / "app" / "ui" / "main_window_integrated.py"
+                # パスの正規化とバリデーション
+                integrated_ui_path = Path(os.path.normpath(str(integrated_ui_path)))
+                
+                # パスがプロジェクトルート内にあることを確認
+                try:
+                    integrated_ui_path.relative_to(project_root)
+                except ValueError:
+                    raise ValueError(f"Invalid path: {integrated_ui_path} is outside project root")
+                
+                if not integrated_ui_path.exists():
+                    raise FileNotFoundError(f"integrated UI not found at {integrated_ui_path}")
+                
+                # ファイル読み取り権限の確認
+                if not os.access(integrated_ui_path, os.R_OK):
+                    raise PermissionError(f"Cannot read file: {integrated_ui_path}")
+                
                 self.process = subprocess.Popen(
-                    [sys.executable, "app/ui/main_window_integrated.py"],
+                    [sys.executable, str(integrated_ui_path)],
                     cwd=project_root,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -99,7 +121,12 @@ class TechZipPlugin(BasePlugin):
         try:
             if self.process:
                 self.process.terminate()
-                self.process.wait(timeout=5)
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    print(f"[{self.metadata.name}] 正常終了がタイムアウト、強制終了します")
+                    self.process.kill()
+                    self.process.wait()
                 self.process = None
                 self.is_running = False
             return True
