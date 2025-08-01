@@ -14,13 +14,20 @@ import logging
 
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from cryptography.fernet import Fernet
 
 # パス解決と環境変数管理をインポート
 from utils.path_resolver import PathResolver
 from utils.env_manager import EnvManager
 
 logger = logging.getLogger(__name__)
+
+# cryptographyは暗号化機能を使用する場合のみ必要
+try:
+    from cryptography.fernet import Fernet
+    CRYPTOGRAPHY_AVAILABLE = True
+except ImportError:
+    CRYPTOGRAPHY_AVAILABLE = False
+    logger.warning("cryptography module not available - token encryption disabled")
 
 
 class SlackIntegration:
@@ -301,6 +308,10 @@ Botがチャネルに参加していません。
         Returns:
             暗号化されたトークン
         """
+        if not CRYPTOGRAPHY_AVAILABLE:
+            logger.warning("Cryptography not available - returning token as-is")
+            return token
+            
         # 固定キーを使用（本番環境では環境変数等から取得すべき）
         key = b'TechZip-Slack-Integration-Key-32bytes-long!!!'[:32].ljust(32, b'0')
         fernet = Fernet(Fernet.generate_key())  # 実際の実装では固定キーを使用
@@ -317,6 +328,10 @@ Botがチャネルに参加していません。
         Returns:
             平文のトークン
         """
+        if not CRYPTOGRAPHY_AVAILABLE:
+            logger.warning("Cryptography not available - returning token as-is")
+            return encrypted_token
+            
         # 固定キーを使用（本番環境では環境変数等から取得すべき）
         key = b'TechZip-Slack-Integration-Key-32bytes-long!!!'[:32].ljust(32, b'0')
         fernet = Fernet(Fernet.generate_key())  # 実際の実装では固定キーを使用
@@ -403,10 +418,10 @@ class SlackConfig:
         if encrypted_token:
             try:
                 # 暗号化されている場合は復号化
-                if encrypted_token.startswith("gAAAAA"):  # Fernetの暗号化プレフィックス
+                if CRYPTOGRAPHY_AVAILABLE and encrypted_token.startswith("gAAAAA"):  # Fernetの暗号化プレフィックス
                     return SlackIntegration.decrypt_token(encrypted_token)
                 else:
-                    # 平文の場合はそのまま返す
+                    # 平文の場合またはcryptography未インストールの場合はそのまま返す
                     return encrypted_token
             except:
                 return encrypted_token

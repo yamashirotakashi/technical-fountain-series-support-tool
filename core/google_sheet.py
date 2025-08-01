@@ -69,7 +69,8 @@ class GoogleSheetClient:
             {
                 'row': 行番号（1ベース）,
                 'n_code': Nコード,
-                'repository_name': リポジトリ名（C列）
+                'repository_name': リポジトリ名（C列）,
+                'author_slack_id': 著者SlackID（J列）
             }
         """
         return self._execute_with_retry(self._search_n_code_impl, n_code)
@@ -80,8 +81,8 @@ class GoogleSheetClient:
         """
         self.logger.info(f"Nコード検索開始: {n_code}")
         
-        # A列とC列のデータを取得（1000行まで）
-        range_name = 'A1:C1000'
+        # A列、C列、J列のデータを取得（1000行まで）
+        range_name = 'A1:J1000'
         self.logger.debug(f"API呼び出し - Sheet ID: {self.sheet_id}, Range: {range_name}")
         
         try:
@@ -113,13 +114,19 @@ class GoogleSheetClient:
                         self.logger.warning(f"行 {row_idx} のC列にリポジトリ名がありません")
                         return None
                     
+                    # J列の値を取得（存在する場合）
+                    author_slack_id = row[9] if len(row) > 9 else None
+                    
                     result_dict = {
                         'row': row_idx,
                         'n_code': n_code,
-                        'repository_name': repository_name.strip()
+                        'repository_name': repository_name.strip(),
+                        'author_slack_id': author_slack_id.strip() if author_slack_id else None
                     }
                     
                     self.logger.info(f"Nコード {n_code} を行 {row_idx} で発見: {repository_name}")
+                    if author_slack_id:
+                        self.logger.info(f"著者SlackID: {author_slack_id}")
                     return result_dict
         
         self.logger.warning(f"Nコード {n_code} が見つかりませんでした")

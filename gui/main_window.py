@@ -828,9 +828,21 @@ class MainWindow(QMainWindow):
                 )
                 return
             
+            # GoogleシートからNコード情報を取得（著者SlackID含む）
+            author_slack_id = None
+            try:
+                from core.google_sheet import GoogleSheetClient
+                sheet_client = GoogleSheetClient()
+                sheet_data = sheet_client.search_n_code(n_code)
+                if sheet_data and 'author_slack_id' in sheet_data:
+                    author_slack_id = sheet_data['author_slack_id']
+                    self.log_panel.append_log(f"著者SlackID: {author_slack_id or '未設定'}")
+            except Exception as e:
+                self.log_panel.append_log(f"著者SlackID取得エラー: {str(e)}")
+            
             # 確認ダイアログを表示
             default_message = poster.get_default_message()
-            dialog = PDFPostDialog(pdf_path, channel_name, default_message, self)
+            dialog = PDFPostDialog(pdf_path, channel_name, default_message, author_slack_id, self)
             
             approved, message = dialog.get_confirmation()
             if not approved:

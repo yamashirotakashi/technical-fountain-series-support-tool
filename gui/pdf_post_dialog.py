@@ -30,7 +30,7 @@ class PDFPostDialog(QDialog):
     # シグナル定義
     post_requested = pyqtSignal(str, str, str)  # pdf_path, channel, message
     
-    def __init__(self, pdf_path: str, channel: str, default_message: str, parent=None):
+    def __init__(self, pdf_path: str, channel: str, default_message: str, author_slack_id: Optional[str] = None, parent=None):
         """
         初期化
         
@@ -38,12 +38,14 @@ class PDFPostDialog(QDialog):
             pdf_path: PDFファイルのパス
             channel: 投稿先チャネル名
             default_message: デフォルトメッセージ
+            author_slack_id: 著者のSlackID（オプション）
             parent: 親ウィジェット
         """
         super().__init__(parent)
         self.pdf_path = pdf_path
         self.channel = channel
         self.default_message = default_message
+        self.author_slack_id = author_slack_id
         
         self.setWindowTitle("Slack投稿確認")
         self.setModal(True)
@@ -99,7 +101,25 @@ class PDFPostDialog(QDialog):
         message_layout = QVBoxLayout()
         
         self.message_edit = QTextEdit()
-        self.message_edit.setPlainText(self.default_message)
+        
+        # 著者メンションを含むメッセージの構築
+        if self.author_slack_id:
+            # Slackメンション形式に変換（<@UserID>形式）
+            # 既に<@で始まっている場合はそのまま、そうでない場合は<@>で囲む
+            if self.author_slack_id.startswith('<@') and self.author_slack_id.endswith('>'):
+                slack_mention = self.author_slack_id
+            elif self.author_slack_id.startswith('@'):
+                # @だけの場合は@を除去して<@>で囲む
+                slack_mention = f"<@{self.author_slack_id[1:]}>"
+            else:
+                # 何もついていない場合は<@>で囲む
+                slack_mention = f"<@{self.author_slack_id}>"
+            
+            full_message = f"{slack_mention}\n\n{self.default_message}"
+        else:
+            full_message = self.default_message
+            
+        self.message_edit.setPlainText(full_message)
         self.message_edit.setMaximumHeight(100)
         self.message_edit.setPlaceholderText("メッセージを入力してください...")
         message_layout.addWidget(self.message_edit)
