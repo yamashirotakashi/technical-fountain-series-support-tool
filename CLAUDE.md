@@ -2,7 +2,7 @@
 @../CLAUDE.md
 
 # プロジェクト名: 技術の泉シリーズ制作支援ツール
-最終更新: 2025-01-19
+最終更新: 2025-01-08
 
 ## 🎯 プロジェクト概要
 - **目的**: 技術の泉シリーズの制作プロセスを自動化・効率化
@@ -201,3 +201,38 @@ GMAIL_APP_PASSWORD=your_app_password_here
 - Slack/GitHubリソースの一括作成
 - 高権限操作の安全な実行
 - 詳細: `/docs/project_initialization_automation_research.md`
+
+## 🚨 次回セッション必須タスク（2025-01-08追加）
+
+### 1. 【最優先】TECHZIP1.8 Windows EXE Build & Test (TECHZIP-BUILD-001)
+**状況**: Build script作成完了、ディレクトリ修正済み
+**実行場所**: `C:\Users\tky99\DEV\technical-fountain-series-support-tool\dist\`
+**緊急度**: 🔴 Critical - 即座実行必須
+
+**Phase 1: EXE Build実行**:
+```powershell
+cd C:\Users\tky99\DEV\technical-fountain-series-support-tool\dist
+.\build_techzip18_folder.ps1
+```
+
+**Phase 2: 機能検証**:
+- [x] ビルドスクリプト作成（完了）
+- [x] ディレクトリパス修正（完了）
+- [ ] PyInstaller実行とEXE生成
+- [ ] GUI起動テスト
+- [ ] API設定画面動作確認（2列レイアウト）
+- [ ] ConfigManager統合動作確認
+- [ ] 全機能動作テスト
+
+**Phase 3: 配布準備**:
+- [ ] README.txt作成（自動）
+- [ ] 動作確認レポート作成
+- [ ] バージョン1.8の新機能動作確認
+
+**実装済み内容**:
+- ✅ ConfigManager class統合
+- ✅ API設定画面2列レイアウト
+- ✅ 全API設定項目デフォルト値適用
+- ✅ パスワードマスク除去
+- ✅ Python 3.13.5完全対応
+- ✅ ビルドスクリプト作成・修正完了
