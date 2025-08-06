@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """技術の泉シリーズ制作支援ツール - エントリーポイント"""
 import sys
@@ -32,6 +32,16 @@ def main():
     """アプリケーションのエントリーポイント"""
     # ロガーを初期化
     logger = get_logger(__name__)
+    
+    # Phase 3-2: DI Container初期化
+    logger.info("DI Container設定を初期化します")
+    try:
+        from core.di_container import configure_services
+        configure_services()
+        logger.info("DI Container設定完了")
+    except Exception as e:
+        logger.error(f"DI Container初期化エラー: {e}", exc_info=True)
+        # DI設定が失敗してもアプリケーションを続行
     
     # 起動時ログ収集を開始
     startup_logger = StartupLogger()

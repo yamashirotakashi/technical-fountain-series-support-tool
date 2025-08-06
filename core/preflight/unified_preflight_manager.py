@@ -1,4 +1,6 @@
 """統合Pre-flightマネージャー - 全機能の統合管理"""
+from __future__ import annotations
+
 import os
 import time
 import asyncio

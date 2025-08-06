@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 ReVIEW変換API疎通テストスクリプト
 
@@ -15,9 +15,10 @@ from pathlib import Path
 from datetime import datetime
 
 # API設定
-API_BASE_URL = "http://sd001.nextpublishing.jp/rapture"
-API_USERNAME = "ep_user"
-API_PASSWORD = "Nn7eUTX5"
+import os
+API_BASE_URL = os.getenv("NEXTPUB_API_BASE_URL", "http://sd001.nextpublishing.jp/rapture")
+API_USERNAME = os.getenv("NEXTPUB_USERNAME", "ep_user")
+API_PASSWORD = os.getenv("NEXTPUB_PASSWORD", "Nn7eUTX5")
 
 # テスト結果を格納
 test_results = {

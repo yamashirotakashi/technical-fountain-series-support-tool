@@ -110,8 +110,13 @@ class FileSelector(QWidget):
     
     def _select_file(self):
         """ファイル選択ダイアログを表示"""
+        # デフォルトパスを設定
+        default_path = r"G:\マイドライブ\[git]"
+        if not Path(default_path).exists():
+            default_path = ""
+            
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "ファイルを選択", "", self.file_filter
+            self, "ファイルを選択", default_path, self.file_filter
         )
         
         if file_path:
@@ -160,8 +165,13 @@ class FolderSelector(QWidget):
     
     def _select_folder(self):
         """フォルダ選択ダイアログを表示"""
+        # デフォルトパスを設定
+        default_path = r"G:\マイドライブ\[git]"
+        if not Path(default_path).exists():
+            default_path = ""
+            
         folder_path = QFileDialog.getExistingDirectory(
-            self, "フォルダを選択"
+            self, "フォルダを選択", default_path
         )
         
         if folder_path:

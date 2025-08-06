@@ -1,4 +1,5 @@
-﻿"""処理方式選択ダイアログ"""
+from __future__ import annotations
+"""処理方式選択ダイアログ"""
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QRadioButton,
                              QButtonGroup, QLabel, QPushButton, QGroupBox)
 from PyQt6.QtCore import Qt, pyqtSignal

@@ -1,5 +1,7 @@
 """環境変数管理ユーティリティ - 開発環境とEXE環境の両対応"""
 
+from __future__ import annotations
+
 import os
 import sys
 from pathlib import Path
@@ -281,7 +283,17 @@ LOG_LEVEL=INFO
         if value is None:
             return default
         
-        path = Path(value)
+        # WSL環境でWindowsパス（C:\...）を適切に変換
+        if os.name != 'nt' and value.startswith(('C:\\', 'c:\\', 'C:/', 'c:/')):
+            # WindowsパスをWSLパスに変換
+            windows_path = value.replace('\\', '/')
+            if windows_path.lower().startswith('c:'):
+                wsl_path = '/mnt/c' + windows_path[2:]
+                path = Path(wsl_path)
+            else:
+                path = Path(value)
+        else:
+            path = Path(value)
         
         # 相対パスの場合、適切なベースパスからの相対パスとして解決
         if not path.is_absolute():

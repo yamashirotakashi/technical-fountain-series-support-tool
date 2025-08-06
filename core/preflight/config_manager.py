@@ -1,4 +1,6 @@
 """Pre-flight設定管理システム"""
+from __future__ import annotations
+
 import json
 import os
 from pathlib import Path
@@ -31,9 +33,9 @@ class EmailConfig:
 @dataclass
 class ServiceConfig:
     """Word2XHTML5サービス設定"""
-    service_url: str = "http://trial.nextpublishing.jp/upload_46tate/"
-    auth_username: str = "ep_user"
-    auth_password: str = "Nn7eUTX5"
+    service_url: str = ""
+    auth_username: str = ""
+    auth_password: str = ""
     timeout_seconds: int = 300
     rate_limit_seconds: float = 5.0
     max_retries: int = 3
@@ -44,7 +46,7 @@ class ServiceConfig:
     cover_page: int = 0           # 扉なし
     crop_marks: int = 0           # トンボなし
     style_selection: int = 2      # 本文ソースコード横書き用
-    index_page: int = 0           # 索引なし
+    index_page: int = 0           # 索引なし           # 索引なし
 
 
 @dataclass

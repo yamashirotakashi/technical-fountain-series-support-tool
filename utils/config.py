@@ -1,4 +1,5 @@
-﻿"""設定管理モジュール"""
+from __future__ import annotations
+"""設定管理モジュール"""
 import json
 import os
 from pathlib import Path

@@ -1,4 +1,5 @@
 """ログ表示パネルモジュール"""
+from __future__ import annotations
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QTextCursor, QColor, QTextCharFormat

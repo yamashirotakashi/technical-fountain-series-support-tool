@@ -1,4 +1,5 @@
 """包括的な設定ダイアログ - 認証情報と設定の統合管理"""
+from __future__ import annotations
 
 import json
 import os

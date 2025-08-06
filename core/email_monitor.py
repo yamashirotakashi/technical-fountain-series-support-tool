@@ -1,4 +1,5 @@
-﻿"""メール監視モジュール"""
+from __future__ import annotations
+"""メール監視モジュール"""
 import imaplib
 import email
 from email.message import Message

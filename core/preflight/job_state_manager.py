@@ -1,4 +1,6 @@
 """ジョブ状態管理システム"""
+from __future__ import annotations
+
 import json
 import time
 import threading
@@ -10,6 +12,12 @@ from enum import Enum
 from collections import defaultdict
 
 from utils.logger import get_logger
+
+# ConfigManagerのインポート（try-except ImportErrorパターン）
+try:
+    from .config_manager import ConfigManager
+except ImportError:
+    ConfigManager = None
 
 
 class JobStatus(Enum):
@@ -119,8 +127,9 @@ class JobState:
 class JobStateManager:
     """ジョブ状態の一元管理システム"""
     
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: Optional[str] = None, config_manager: Optional['ConfigManager'] = None):
         self.logger = get_logger(__name__)
+        self.config_manager = config_manager
         self._jobs: Dict[str, JobState] = {}
         self._lock = threading.RLock()
         self._observers: List[Callable[[str, JobState], None]] = []
@@ -129,7 +138,10 @@ class JobStateManager:
         if storage_path:
             self.storage_path = Path(storage_path)
         else:
-            self.storage_path = Path.home() / ".techzip" / "job_states.json"
+            # ConfigManagerから設定値を取得（デフォルト値付き）
+            default_base_dir = str(Path.home() / ".techzip")
+            base_dir = self.config_manager.get("paths.cache_directory", default_base_dir) if self.config_manager else default_base_dir
+            self.storage_path = Path(base_dir) / "job_states.json"
         
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
         
@@ -420,9 +432,12 @@ class JobStateManager:
     def _start_cleanup_thread(self) -> None:
         """定期クリーンアップスレッドを開始"""
         def cleanup_worker():
+            # ConfigManagerから設定値を取得
+            cleanup_interval = self.config_manager.get("job_state.cleanup_interval_hours", 1) if self.config_manager else 1
+            
             while True:
                 try:
-                    time.sleep(3600)  # 1時間間隔
+                    time.sleep(cleanup_interval * 3600)  # 時間を秒に変換
                     self._cleanup_old_jobs()
                 except Exception as e:
                     self.logger.error(f"クリーンアップエラー: {e}")
@@ -430,8 +445,12 @@ class JobStateManager:
         cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
         cleanup_thread.start()
     
-    def _cleanup_old_jobs(self, max_age_days: int = 7) -> None:
+    def _cleanup_old_jobs(self, max_age_days: Optional[int] = None) -> None:
         """古いジョブをクリーンアップ"""
+        # ConfigManagerから設定値を取得
+        if max_age_days is None:
+            max_age_days = self.config_manager.get("job_state.max_age_days", 7) if self.config_manager else 7
+            
         with self._lock:
             cutoff_time = datetime.now() - timedelta(days=max_age_days)
             jobs_to_remove = []

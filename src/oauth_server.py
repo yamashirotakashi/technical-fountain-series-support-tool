@@ -12,9 +12,34 @@ from urllib.parse import parse_qs, urlparse
 import webbrowser
 import requests
 
-CLIENT_ID = "266696553856.9282469142480"  # Basic InformationページのClient ID
-CLIENT_SECRET = "2f6e8c88de63e41694597f17d4d8b5fa"  # Basic InformationページのClient Secret
-REDIRECT_URI = "http://localhost:8888/callback"
+# ConfigManagerをインポート
+try:
+    from src.slack_pdf_poster import ConfigManager
+except ImportError:
+    ConfigManager = None
+
+def get_oauth_config():
+    """OAuth設定を取得"""
+    config_manager = ConfigManager() if ConfigManager else None
+    if config_manager:
+        return {
+            'client_id': config_manager.get("api.slack.client_id", "266696553856.9282469142480"),
+            'client_secret': config_manager.get("api.slack.client_secret", "2f6e8c88de63e41694597f17d4d8b5fa"),
+            'redirect_uri': config_manager.get("oauth.redirect_uri", "http://localhost:8888/callback")
+        }
+    else:
+        # フォールバック値
+        return {
+            'client_id': "266696553856.9282469142480",
+            'client_secret': "2f6e8c88de63e41694597f17d4d8b5fa", 
+            'redirect_uri': "http://localhost:8888/callback"
+        }
+
+# OAuth設定を取得
+oauth_config = get_oauth_config()
+CLIENT_ID = oauth_config['client_id']
+CLIENT_SECRET = oauth_config['client_secret']
+REDIRECT_URI = oauth_config['redirect_uri']
 
 # 必要なUser Scopes
 USER_SCOPES = [
@@ -65,7 +90,9 @@ class OAuthHandler(BaseHTTPRequestHandler):
             
             if code:
                 # アクセストークンを取得
-                response = requests.post('https://slack.com/api/oauth.v2.access', data={
+                # Slack OAuth URL設定から取得
+                slack_oauth_url = os.getenv('SLACK_OAUTH_URL', 'https://slack.com/api/oauth.v2.access')
+                response = requests.post(slack_oauth_url, data={
                     'client_id': CLIENT_ID,
                     'client_secret': CLIENT_SECRET,
                     'code': code,

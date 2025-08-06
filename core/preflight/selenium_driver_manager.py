@@ -12,13 +12,29 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import WebDriverException
 from utils.logger import get_logger
 
+# ConfigManagerをインポート
+try:
+    from src.slack_pdf_poster import ConfigManager
+except ImportError:
+    ConfigManager = None
+
 
 class SeleniumDriverManager:
     """ChromeDriverの自動管理クラス"""
+from __future__ import annotations
     
-    def __init__(self):
+    def __init__(self, config_manager: Optional['ConfigManager'] = None):
         self.logger = get_logger(__name__)
-        self.driver_dir = Path.home() / ".techzip" / "drivers"
+        self.config_manager = config_manager or (ConfigManager() if ConfigManager else None)
+        
+        # ドライバーディレクトリをConfigManagerから取得
+        if self.config_manager:
+            cache_base = self.config_manager.get("paths.cache_directory", str(Path.home() / ".techzip"))
+        else:
+            cache_base = str(Path.home() / ".techzip")
+            self.logger.warning("ConfigManagerが利用できません。デフォルトキャッシュパスを使用します。")
+        
+        self.driver_dir = Path(cache_base) / "drivers"
         self.driver_dir.mkdir(parents=True, exist_ok=True)
         self.driver: Optional[webdriver.Chrome] = None
         
@@ -58,12 +74,14 @@ class SeleniumDriverManager:
                 except:
                     pass
                     
-            # macOS/Linux - 簡易的に最新の安定版を返す
-            return "131.0.6778.204"  # 2025年1月時点の安定版
+            # macOS/Linux - ConfigManagerから設定された安定版を返す
+            fallback_version = self.config_manager.get("selenium.chrome_fallback_version", "131.0.6778.204") if self.config_manager else "131.0.6778.204"
+            return fallback_version
             
         except Exception as e:
             self.logger.warning(f"Chromeバージョン取得失敗: {e}")
-            return "131.0.6778.204"
+            fallback_version = self.config_manager.get("selenium.chrome_fallback_version", "131.0.6778.204") if self.config_manager else "131.0.6778.204"
+            return fallback_version
     
     def _download_chromedriver(self, version: str) -> Path:
         """ChromeDriverをダウンロード"""
@@ -110,7 +128,8 @@ class SeleniumDriverManager:
             for url in urls_to_try:
                 try:
                     self.logger.info(f"ChromeDriverをダウンロード試行中: {url}")
-                    response = requests.get(url, stream=True, timeout=30)
+                    download_timeout = self.config_manager.get("selenium.download_timeout", 30) if self.config_manager else 30
+                    response = requests.get(url, stream=True, timeout=download_timeout)
                     response.raise_for_status()
                     
                     # 最新バージョン番号の取得（LATEST_RELEASEの場合）
@@ -119,7 +138,7 @@ class SeleniumDriverManager:
                         self.logger.info(f"最新バージョン: {latest_version}")
                         # 新しいURLで再試行
                         driver_url = f"{base_url}/{latest_version}/{platform_name}/{filename}"
-                        response = requests.get(driver_url, stream=True, timeout=30)
+                        response = requests.get(driver_url, stream=True, timeout=download_timeout)
                         response.raise_for_status()
                     
                     # ファイルをダウンロード

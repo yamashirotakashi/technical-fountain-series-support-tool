@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 大きなファイルでのアップロードテスト
 実際のユーザー環境（6MB）を再現

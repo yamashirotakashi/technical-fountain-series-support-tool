@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Pre-flight Check機能のパッケージ"""
 from .verifier_base import PreflightVerifier
 from .word2xhtml_scraper import Word2XhtmlScrapingVerifier

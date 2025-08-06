@@ -1,0 +1,60 @@
+api:
+  github:
+    api_base_url: https://api.github.com
+    default_user: YOUR_GITHUB_USER
+    token: YOUR_GITHUB_TOKEN  # ghp_xxxxx形式のトークン
+  gmail:
+    default_address: YOUR_EMAIL@gmail.com
+    scopes:
+    - https://www.googleapis.com/auth/gmail.readonly
+  google_cloud:
+    console_url: https://console.cloud.google.com/
+    sheets_scope: https://www.googleapis.com/auth/spreadsheets.readonly
+  nextpublishing:
+    base_url: http://trial.nextpublishing.jp/rapture/
+    download_endpoint: do_download_pdf
+    epub_endpoint: do_download_epub
+    gcf_endpoint: do_download_gcf
+    password: YOUR_NEXTPUBLISHING_PASSWORD
+    retry_count: 3
+    review_endpoint: do_download_review
+    timeout: 60
+    username: YOUR_NEXTPUBLISHING_USERNAME
+  slack:
+    api_base_url: https://slack.com/api/
+    bot_token: YOUR_SLACK_BOT_TOKEN  # xoxb-xxxxx形式のトークン
+    oauth_url: https://slack.com/api/oauth.v2.access
+    rate_limit_delay: 1.0
+    timeout: 30
+defaults:
+  api_base_url: http://sd001.nextpublishing.jp/rapture
+email:
+  address: YOUR_EMAIL@gmail.com
+  app_password: YOUR_APP_PASSWORD  # Gmailアプリパスワード（スペース区切り）
+  check_interval: 60
+  enable_monitoring: true
+  imap_port: 993
+  imap_server: imap.gmail.com
+  smtp_port: 587
+  smtp_server: smtp.gmail.com
+features:
+  debug_mode: false
+  enable_batch_processing: false
+  enable_email_monitoring: false
+  enable_github_integration: false
+  enable_slack_integration: false
+logging:
+  file_rotation: daily
+  level: INFO
+  max_file_size: 10MB
+  retention_days: 30
+paths:
+  adobe_exe: C:\Program Files\Adobe\Acrobat DC\Acrobat\Acrobat.exe
+  cache_dir: cache
+  log_dir: logs
+  temp_dir: temp
+  venv_activate: venv/bin/activate
+project:
+  author: 技術の泉シリーズ制作チーム
+  name: TechnicalFountainSeriesSupportTool
+  version: 1.8

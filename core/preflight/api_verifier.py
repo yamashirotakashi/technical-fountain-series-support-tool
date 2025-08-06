@@ -1,4 +1,6 @@
 """Word2XHTML5 API実装（将来対応用）"""
+from __future__ import annotations
+
 import requests
 from typing import List, Dict, Tuple, Optional
 from pathlib import Path
@@ -6,6 +8,12 @@ import time
 
 from .verifier_base import PreflightVerifier
 from utils.logger import get_logger
+
+# ConfigManagerのインポート（try-except ImportErrorパターン）
+try:
+    from .config_manager import ConfigManager
+except ImportError:
+    ConfigManager = None
 
 
 class Word2XhtmlApiVerifier(PreflightVerifier):
@@ -15,15 +23,18 @@ class Word2XhtmlApiVerifier(PreflightVerifier):
     現在はAPIが提供されていないため、実際には使用されません。
     """
     
-    # APIエンドポイント（仮想）
-    API_BASE_URL = "https://api.nextpublishing.jp/v1/word2xhtml"
-    
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, config_manager: Optional['ConfigManager'] = None):
         """
         Args:
             api_key: APIキー（将来必要になる可能性）
+            config_manager: 設定管理クラス
         """
         self.logger = get_logger(__name__)
+        self.config_manager = config_manager
+        
+        # ConfigManagerから設定値を取得（デフォルト値付き）
+        self.api_base_url = self.config_manager.get("api.word2xhtml.base_url", "https://api.nextpublishing.jp/v1/word2xhtml") if self.config_manager else "https://api.nextpublishing.jp/v1/word2xhtml"
+        
         self.api_key = api_key
         self.session = requests.Session()
         
@@ -43,6 +54,10 @@ class Word2XhtmlApiVerifier(PreflightVerifier):
         """
         job_ids = []
         
+        # ConfigManagerから設定値を取得
+        submit_timeout = self.config_manager.get("api.word2xhtml.submit_timeout", 30) if self.config_manager else 30
+        rate_limit_delay = self.config_manager.get("api.word2xhtml.rate_limit_delay", 1) if self.config_manager else 1
+        
         for file_path in file_paths:
             try:
                 # ファイルを読み込み
@@ -52,10 +67,10 @@ class Word2XhtmlApiVerifier(PreflightVerifier):
                     
                     # API呼び出し（仮想）
                     response = self.session.post(
-                        f"{self.API_BASE_URL}/submit",
+                        f"{self.api_base_url}/submit",
                         files=files,
                         data=data,
-                        timeout=30
+                        timeout=submit_timeout
                     )
                     
                     if response.status_code == 200:
@@ -75,9 +90,9 @@ class Word2XhtmlApiVerifier(PreflightVerifier):
                 self.logger.error(f"ファイル送信エラー: {file_path} - {e}")
                 job_ids.append("")
                 
-            # レート制限（1秒間隔）
+            # レート制限（ConfigManagerから取得した秒間隔）
             if len(file_paths) > 1:
-                time.sleep(1)
+                time.sleep(rate_limit_delay)
                 
         return job_ids
         
@@ -90,12 +105,15 @@ class Word2XhtmlApiVerifier(PreflightVerifier):
         """
         results = {}
         
+        # ConfigManagerから設定値を取得
+        status_timeout = self.config_manager.get("api.word2xhtml.status_timeout", 30) if self.config_manager else 30
+        
         try:
             # バッチステータス確認（仮想）
             response = self.session.post(
-                f"{self.API_BASE_URL}/status/batch",
+                f"{self.api_base_url}/status/batch",
                 json={'job_ids': job_ids},
-                timeout=30
+                timeout=status_timeout
             )
             
             if response.status_code == 200:
@@ -137,10 +155,13 @@ class Word2XhtmlApiVerifier(PreflightVerifier):
         Returns:
             PDFデータ（バイナリ）、失敗時はNone
         """
+        # ConfigManagerから設定値を取得
+        download_timeout = self.config_manager.get("api.word2xhtml.download_timeout", 60) if self.config_manager else 60
+        
         try:
             response = self.session.get(
-                f"{self.API_BASE_URL}/download/{job_id}",
-                timeout=60
+                f"{self.api_base_url}/download/{job_id}",
+                timeout=download_timeout
             )
             
             if response.status_code == 200:

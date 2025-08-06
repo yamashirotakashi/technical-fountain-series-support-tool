@@ -1,4 +1,5 @@
 """Gmail OAuth認証のEXE環境対応ヘルパーモジュール"""
+from __future__ import annotations
 
 import os
 import sys

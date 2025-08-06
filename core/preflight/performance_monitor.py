@@ -1,4 +1,6 @@
 """Pre-flightパフォーマンス監視システム"""
+from __future__ import annotations
+
 import time
 import psutil
 import threading
@@ -9,6 +11,10 @@ from collections import deque, defaultdict
 from contextlib import contextmanager
 
 from utils.logger import get_logger
+
+# Configuration Provider統合
+from core.configuration_provider import ConfigurationProvider
+from core.di_container import inject
 
 
 @dataclass
@@ -90,23 +96,61 @@ class PerformanceThresholds:
     disk_io_critical: float = 500.0# ディスクI/O重大閾値（MB/s）
     response_time_warning: float = 5.0    # レスポンス時間警告閾値（秒）
     response_time_critical: float = 10.0  # レスポンス時間重大閾値（秒）
+    
+    @classmethod
+    def from_config(cls, config_manager: Optional['ConfigManager'] = None) -> 'PerformanceThresholds':
+        """ConfigManagerから閾値設定を読み込み"""
+        if not config_manager:
+            return cls()  # デフォルト値を使用
+        
+        return cls(
+            cpu_warning=config_manager.get("performance.cpu_warning_threshold", 70.0),
+            cpu_critical=config_manager.get("performance.cpu_critical_threshold", 90.0),
+            memory_warning=config_manager.get("performance.memory_warning_threshold", 80.0),
+            memory_critical=config_manager.get("performance.memory_critical_threshold", 95.0),
+            disk_io_warning=config_manager.get("performance.disk_io_warning_threshold", 100.0),
+            disk_io_critical=config_manager.get("performance.disk_io_critical_threshold", 500.0),
+            response_time_warning=config_manager.get("performance.response_time_warning_threshold", 5.0),
+            response_time_critical=config_manager.get("performance.response_time_critical_threshold", 10.0)
+        )
 
 
 class PerformanceMonitor:
     """パフォーマンス監視システム"""
     
-    def __init__(self, collection_interval: int = 30, retention_hours: int = 24):
+    @inject
+    def __init__(self, config_provider: ConfigurationProvider,
+                 collection_interval: Optional[int] = None, 
+                 retention_hours: Optional[int] = None):
+        """
+        パフォーマンス監視システムを初期化
+        
+        Args:
+            config_provider: 統一設定プロバイダー（DI注入）
+            collection_interval: データ収集間隔（秒）
+            retention_hours: データ保持時間（時間）
+        """
         self.logger = get_logger(__name__)
-        self.collection_interval = collection_interval
-        self.retention_hours = retention_hours
+        self.config_provider = config_provider
+        
+        # ConfigurationProviderから設定値を取得（デフォルト値付き）
+        if collection_interval is None:
+            self.collection_interval = self.config_provider.get("performance.collection_interval", 30)
+        else:
+            self.collection_interval = collection_interval
+            
+        if retention_hours is None:
+            self.retention_hours = self.config_provider.get("performance.retention_hours", 24)
+        else:
+            self.retention_hours = retention_hours
         
         # データ保存
-        self._metrics_history: deque = deque(maxlen=int(retention_hours * 3600 / collection_interval))
+        self._metrics_history: deque = deque(maxlen=int(self.retention_hours * 3600 / self.collection_interval))
         self._alerts: Dict[str, PerformanceAlert] = {}
         self._alert_callbacks: List[Callable[[PerformanceAlert], None]] = []
         
-        # 設定
-        self.thresholds = PerformanceThresholds()
+        # 設定（ConfigManagerから読み込み）
+        self.thresholds = PerformanceThresholds.from_config(self.config_manager)
         
         # 監視状態
         self._monitoring = False
@@ -120,7 +164,9 @@ class PerformanceMonitor:
         
         # カスタム指標
         self._custom_metrics: Dict[str, Any] = {}
-        self._operation_times: deque = deque(maxlen=100)  # 最新100操作の実行時間
+        # ConfigManagerから操作履歴保持数を取得
+        max_operations = self.config_manager.get("performance.max_operation_history", 100) if self.config_manager else 100
+        self._operation_times: deque = deque(maxlen=max_operations)
     
     def start_monitoring(self) -> None:
         """監視開始"""
@@ -164,7 +210,9 @@ class PerformanceMonitor:
         now = datetime.now()
         
         # システム情報
-        cpu_percent = psutil.cpu_percent(interval=1)
+        # ConfigManagerからCPU監視間隔を取得
+        cpu_interval = self.config_manager.get("performance.cpu_interval", 1) if self.config_manager else 1
+        cpu_percent = psutil.cpu_percent(interval=cpu_interval)
         cpu_count = psutil.cpu_count()
         
         memory = psutil.virtual_memory()
@@ -430,9 +478,13 @@ class PerformanceMonitor:
 # グローバルインスタンス
 _performance_monitor_instance: Optional[PerformanceMonitor] = None
 
-def get_performance_monitor() -> PerformanceMonitor:
+def get_performance_monitor(config_provider: Optional[ConfigurationProvider] = None) -> PerformanceMonitor:
     """パフォーマンス監視システムのグローバルインスタンスを取得"""
     global _performance_monitor_instance
     if _performance_monitor_instance is None:
-        _performance_monitor_instance = PerformanceMonitor()
+        # ConfigurationProviderが渡されていない場合は統一設定を取得
+        if config_provider is None:
+            from core.configuration_provider import get_unified_config
+            config_provider = get_unified_config()
+        _performance_monitor_instance = PerformanceMonitor(config_provider=config_provider)
     return _performance_monitor_instance

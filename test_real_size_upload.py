@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 実際のサイズ（6MB）でのアップロードテスト
 """

@@ -1,5 +1,7 @@
 """パス解決ユーティリティ - 開発環境とEXE環境の両対応"""
 
+from __future__ import annotations
+
 import sys
 import os
 from pathlib import Path

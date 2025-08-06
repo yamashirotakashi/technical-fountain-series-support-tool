@@ -1,4 +1,6 @@
 """強化版IMAP結果監視モジュール"""
+from __future__ import annotations
+
 import re
 import time
 import email
@@ -11,6 +13,12 @@ from email.utils import parsedate_to_datetime
 
 from .email_result_monitor import PreflightEmailResultMonitor
 from utils.logger import get_logger
+
+# ConfigManagerをインポート
+try:
+    from src.slack_pdf_poster import ConfigManager
+except ImportError:
+    ConfigManager = None
 
 
 @dataclass
@@ -62,9 +70,10 @@ class EnhancedEmailMonitor(PreflightEmailResultMonitor):
         r'https?://[^\s]+/download[^\s]*',
     ]
     
-    def __init__(self, gmail_address: str, gmail_password: str):
+    def __init__(self, gmail_address: str, gmail_password: str, config_manager: Optional['ConfigManager'] = None):
         super().__init__(gmail_address, gmail_password)
         self.logger = get_logger(__name__)
+        self.config_manager = config_manager or (ConfigManager() if ConfigManager else None)
         self._processed_message_ids: Set[str] = set()
         
     def _is_trusted_sender(self, sender_email: str) -> bool:
@@ -190,8 +199,8 @@ class EnhancedEmailMonitor(PreflightEmailResultMonitor):
     def search_results_enhanced(
         self,
         job_ids: List[str],
-        search_hours: int = 24,
-        max_wait_minutes: int = 20
+        search_hours: Optional[int] = None,
+        max_wait_minutes: Optional[int] = None
     ) -> Dict[str, EmailSearchResult]:
         """強化版の結果検索
         
@@ -203,6 +212,12 @@ class EnhancedEmailMonitor(PreflightEmailResultMonitor):
         Returns:
             ジョブID -> 検索結果の辞書
         """
+        # ConfigManagerから設定値を取得（デフォルト値付き）
+        if search_hours is None:
+            search_hours = self.config_manager.get("email.search_hours", 24) if self.config_manager else 24
+        if max_wait_minutes is None:
+            max_wait_minutes = self.config_manager.get("email.max_wait_minutes", 20) if self.config_manager else 20
+        
         results = {}
         found_job_ids = set()
         start_time = time.time()
@@ -240,7 +255,9 @@ class EnhancedEmailMonitor(PreflightEmailResultMonitor):
                 
                 if not message_ids[0]:
                     self.logger.debug("該当するメールが見つかりません")
-                    time.sleep(30)  # 30秒待機して再検索
+                    # ConfigManagerから待機時間を取得
+                    wait_time = self.config_manager.get("email.search_retry_interval", 30) if self.config_manager else 30
+                    time.sleep(wait_time)  # ConfigManagerから取得した秒数で待機して再検索
                     continue
                 
                 # メッセージIDを処理
@@ -321,7 +338,9 @@ class EnhancedEmailMonitor(PreflightEmailResultMonitor):
                 self.logger.info(
                     f"待機中... 残り{len(remaining_jobs)}件: {list(remaining_jobs)[:3]}..."
                 )
-                time.sleep(60)  # 1分待機
+                # ConfigManagerから待機時間を取得
+                wait_time = self.config_manager.get("email.polling_interval", 60) if self.config_manager else 60
+                time.sleep(wait_time)  # ConfigManagerから取得した秒数で待機
                 
         except Exception as e:
             self.logger.error(f"強化版検索エラー: {e}", exc_info=True)

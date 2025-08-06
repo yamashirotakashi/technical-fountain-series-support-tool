@@ -2,6 +2,7 @@
 
 異なる変換サービスからのメールを適切に処理するための抽象化レイヤー
 """
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Dict, Optional, Tuple
 import re

@@ -40,6 +40,7 @@ credentials.json
 techbook-analytics-*.json
 *.key
 *.pem
+config/techzip_config.yaml
 
 # Gmail OAuth
 config/gmail_oauth_credentials.json
@@ -72,5 +73,11 @@ tools/project_initializer/check_user_token_scopes.py
 # Quality reports
 .quality_reports/
 
-# Backup directories
-*.backup_*
+# Backup directories (updated for cleanup)
+backup_*/
+obsolete_*/
+*_backup_*/
+
+# Cache directories
+cache/repo_cache/
+cache/

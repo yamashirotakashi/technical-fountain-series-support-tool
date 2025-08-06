@@ -1,4 +1,6 @@
 """Word2XHTML5サービスのrequests実装"""
+from __future__ import annotations
+
 import time
 import re
 import requests
@@ -10,21 +12,44 @@ from .rate_limiter import RateLimiter
 from .form_settings import Word2XhtmlFormSettings
 from utils.logger import get_logger
 
+# Phase 3-2: DI Container統合によりConfigManager条件分岐import完全解消
+from core.configuration_provider import ConfigurationProvider
+from core.di_container import inject
+
 
 class Word2XhtmlScrapingVerifier(PreflightVerifier):
     """requestsを使用したWord2XHTML5サービスの検証実装"""
     
-    SERVICE_URL = "http://trial.nextpublishing.jp/upload_46tate/"
-    
-    def __init__(self):
+    @inject
+    def __init__(self, config_provider: ConfigurationProvider):
+        """
+        Phase 3-2: Constructor Injection適用 - ハードコーディング値完全排除
+        
+        Args:
+            config_provider: DI注入される統一設定プロバイダー
+        """
         self.logger = get_logger(__name__)
-        self.rate_limiter = RateLimiter(min_interval=5.0)
+        self.config_provider = config_provider
+        
+        # レート制限設定を統一設定から取得
+        min_interval = self.config_provider.get("api.nextpublishing.rate_limit_interval", 5.0)
+        self.rate_limiter = RateLimiter(min_interval=min_interval)
         self.session = requests.Session()
         self.job_file_mapping: Dict[str, str] = {}  # job_id -> file_path
         
-        # Basic認証設定（Re:VIEW変換と同じ認証情報）
+        # サービスURL - ハードコーディング値完全排除
+        self.service_url = self.config_provider.get(
+            "api.nextpublishing.base_url", 
+            "http://trial.nextpublishing.jp/upload_46tate/"
+        )
+        
+        # 認証情報 - 統一設定から取得
+        username = self.config_provider.get("api.nextpublishing.username", "ep_user")
+        password = self.config_provider.get("api.nextpublishing.password", "Nn7eUTX5")
+        
+        # Basic認証設定
         from requests.auth import HTTPBasicAuth
-        self.session.auth = HTTPBasicAuth("ep_user", "Nn7eUTX5")
+        self.session.auth = HTTPBasicAuth(username, password)
         
     def _extract_job_id(self, page_text: str) -> Optional[str]:
         """ページテキストからジョブIDを抽出
@@ -73,10 +98,13 @@ class Word2XhtmlScrapingVerifier(PreflightVerifier):
                 raise Exception(f"フォーム設定が無効です: {settings}")
             
             self.logger.info(f"ファイル送信開始: {file_path}")
-            self.logger.info(f"送信先: {self.SERVICE_URL}")
+            self.logger.info(f"送信先: {self.service_url}")
             
             # フォームデータの準備
             form_data = settings.get_form_data()
+            
+            # タイムアウト設定を統一設定プロバイダーから取得
+            timeout = self.config_provider.get("api.nextpublishing.timeout", 30)
             
             # ファイルの準備
             file_path_obj = Path(file_path)
@@ -90,10 +118,10 @@ class Word2XhtmlScrapingVerifier(PreflightVerifier):
                 
                 # POST送信
                 response = self.session.post(
-                    self.SERVICE_URL,
+                    self.service_url,
                     data=form_data,
                     files=files,
-                    timeout=300
+                    timeout=timeout
                 )
             
             # レスポンス確認

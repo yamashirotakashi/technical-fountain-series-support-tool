@@ -1,4 +1,5 @@
 """メインウィンドウモジュール"""
+from __future__ import annotations
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QSplitter, QMenuBar, QStatusBar, QMessageBox,
                              QInputDialog, QLineEdit, QDialog)
@@ -81,10 +82,102 @@ class MainWindow(QMainWindow):
         self.process_mode = ProcessModeDialog.MODE_API  # デフォルトはAPI方式
         # Gmail API方式をデフォルトにする場合は以下をコメントアウト解除
         # self.process_mode = ProcessModeDialog.MODE_GMAIL_API
+        
+        # ConfigManagerを初期化
+        self.init_config_manager()
+        
         self.setup_ui()
         self.setup_menu()
         self.setup_statusbar()
         self.connect_signals()
+        
+        # 起動時チェック実行
+        self.perform_startup_checks()
+    
+    def init_config_manager(self):
+        """ConfigManagerを初期化"""
+        try:
+            from src.slack_pdf_poster import ConfigManager
+            self.config_manager = ConfigManager()
+            
+            # 設定検証を実行
+            validation_result = self.config_manager.validate_config()
+            errors = validation_result.get('errors', [])
+            missing_vars = validation_result.get('missing_env_vars', [])
+            
+            if errors or missing_vars:
+                print(f"[WARNING] 設定に問題があります: {len(errors)}エラー, {len(missing_vars)}不足環境変数")
+            else:
+                print("[SUCCESS] ConfigManager初期化完了")
+                
+        except Exception as e:
+            print(f"[ERROR] ConfigManager初期化エラー: {e}")
+            # フォールバック: None設定でも動作するように
+            self.config_manager = None
+    
+    def perform_startup_checks(self):
+        """起動時チェックを実行"""
+        try:
+            # ハードコーディング検知チェック（設定で有効な場合）
+            if (self.config_manager and 
+                self.config_manager.get('security.hardcoding_scan_on_startup', False)):
+                self.run_hardcoding_scan()
+            
+            # 設定検証チェック
+            if (self.config_manager and 
+                self.config_manager.get('security.validate_config_on_startup', True)):
+                self.validate_startup_config()
+                
+        except Exception as e:
+            print(f"❌ 起動時チェックエラー: {e}")
+    
+    def run_hardcoding_scan(self):
+        """ハードコーディングスキャンを実行"""
+        try:
+            from src.slack_pdf_poster import HardcodingDetector
+            from pathlib import Path
+            
+            detector = HardcodingDetector()
+            
+            # プロジェクトルートのPythonファイルをスキャン
+            project_root = Path(__file__).parent.parent
+            python_files = list(project_root.rglob("*.py"))
+            
+            # main GUI実行時はクイックスキャン（主要ファイルのみ）
+            key_files = [f for f in python_files if any(
+                keyword in f.name for keyword in ['main', 'config', 'api', 'slack', 'error']
+            )][:5]  # 最大5ファイル
+            
+            if key_files:
+                results = detector.scan_multiple_files(key_files)
+                total_detections = sum(len(detections) for file_results in results.values() 
+                                     for detections in file_results.values())
+                
+                if total_detections > 0:
+                    print(f"🔍 ハードコーディング検知: {total_detections}個検出")
+                else:
+                    print("✅ ハードコーディング検知: 問題なし")
+                    
+        except Exception as e:
+            print(f"❌ ハードコーディングスキャンエラー: {e}")
+    
+    def validate_startup_config(self):
+        """起動時設定検証を実行"""
+        try:
+            if self.config_manager:
+                validation_result = self.config_manager.validate_config()
+                errors = validation_result.get('errors', [])
+                warnings = validation_result.get('warnings', [])
+                missing_vars = validation_result.get('missing_env_vars', [])
+                
+                if errors:
+                    print(f"❌ 設定エラー: {len(errors)}件")
+                elif warnings or missing_vars:
+                    print(f"⚠️ 設定警告: {len(warnings)}警告, {len(missing_vars)}不足環境変数")
+                else:
+                    print("✅ 設定検証: 問題なし")
+        except Exception as e:
+            print(f"❌ 設定検証エラー: {e}")
     
     def setup_ui(self):
         """UIを構築"""
@@ -159,6 +252,14 @@ class MainWindow(QMainWindow):
         repo_settings_action = QAction("リポジトリ設定(&R)", self)
         repo_settings_action.triggered.connect(self.show_repository_settings)
         tools_menu.addAction(repo_settings_action)
+        
+        # セパレータ
+        tools_menu.addSeparator()
+        
+        # ハードコーディングスキャンアクション
+        hardcoding_scan_action = QAction("ハードコーディングスキャン(&H)", self)
+        hardcoding_scan_action.triggered.connect(self.show_hardcoding_scan_dialog)
+        tools_menu.addAction(hardcoding_scan_action)
         
         # ヘルプメニュー
         help_menu = menubar.addMenu("ヘルプ(&H)")
@@ -342,20 +443,108 @@ class MainWindow(QMainWindow):
     
     def show_comprehensive_settings(self):
         """包括的な設定ダイアログを表示"""
-        from gui.comprehensive_settings_dialog import ComprehensiveSettingsDialog
-        dialog = ComprehensiveSettingsDialog(self)
-        dialog.settings_updated.connect(self.on_settings_updated)
-        dialog.exec()
+        from gui.config_dialog import ConfigDialog
+        from src.slack_pdf_poster import ConfigManager
+        
+        # ConfigManagerを初期化
+        config_manager = ConfigManager()
+        
+        # 設定ダイアログを作成
+        dialog = ConfigDialog(config_manager, self)
+        
+        # 設定変更シグナルを接続
+        dialog.config_changed.connect(self.on_config_changed)
+        
+        # ダイアログを表示
+        result = dialog.exec()
+        
+        if result == QDialog.DialogCode.Accepted:
+            self.log_panel.append_log("✅ 設定が正常に更新されました。")
+            self.status_bar.showMessage("設定更新完了", 3000)
+        else:
+            self.log_panel.append_log("❌ 設定の更新がキャンセルされました。")
+            self.status_bar.showMessage("設定更新キャンセル", 3000)
         
     def show_repository_settings(self):
         """リポジトリ設定ダイアログを表示"""
         from gui.repository_settings_dialog import RepositorySettingsDialog
         dialog = RepositorySettingsDialog(self)
         dialog.exec()
+    
+    def show_hardcoding_scan_dialog(self):
+        """ハードコーディングスキャンダイアログを表示"""
+        try:
+            from src.slack_pdf_poster import HardcodingDetector
+            from pathlib import Path
+            
+            # プロジェクトルートのPythonファイルを取得
+            project_root = Path(__file__).parent.parent
+            python_files = list(project_root.rglob("*.py"))
+            
+            # 主要ファイルのみスキャン（高速化）
+            key_files = [f for f in python_files if any(
+                keyword in f.name for keyword in [
+                    'main', 'config', 'api', 'slack', 'error', 'workflow', 'processor'
+                ]
+            )][:10]  # 最大10ファイル
+            
+            if not key_files:
+                QMessageBox.information(self, "スキャン結果", "スキャン対象のファイルが見つかりませんでした。")
+                return
+            
+            # スキャン実行
+            detector = HardcodingDetector()
+            results = detector.scan_multiple_files(key_files)
+            
+            # 結果を整理
+            total_detections = 0
+            categories = {}
+            for file_path, file_results in results.items():
+                for category, detections in file_results.items():
+                    if detections:
+                        total_detections += len(detections)
+                        if category not in categories:
+                            categories[category] = []
+                        categories[category].extend([f"{file_path}: {d}" for d in detections])
+            
+            # 結果表示
+            if total_detections == 0:
+                QMessageBox.information(self, "スキャン結果", "✅ ハードコーディングは検出されませんでした。")
+            else:
+                # カテゴリ別の詳細レポート
+                report_lines = [f"🔍 ハードコーディング検知結果: {total_detections}個検出\n"]
+                for category, items in categories.items():
+                    report_lines.append(f"【{category}】 {len(items)}個")
+                    for item in items[:3]:  # 各カテゴリ最大3個表示
+                        report_lines.append(f"  • {item}")
+                    if len(items) > 3:
+                        report_lines.append(f"  ... 他{len(items)-3}個")
+                    report_lines.append("")
+                
+                report_lines.append("詳細なスキャンは scripts/hardcoding_scan_demo.py を実行してください。")
+                
+                # メッセージボックスで表示
+                QMessageBox.warning(self, "ハードコーディング検知", "\n".join(report_lines))
+                
+                # ログにも出力
+                self.log_panel.append_log(f"🔍 ハードコーディングスキャン: {total_detections}個検出")
+                for category, items in categories.items():
+                    self.log_panel.append_log(f"  【{category}】: {len(items)}個")
+            
+        except Exception as e:
+            error_msg = f"ハードコーディングスキャン中にエラーが発生しました: {str(e)}"
+            QMessageBox.critical(self, "エラー", error_msg)
+            self.log_panel.append_log(f"❌ {error_msg}")
         
+    @pyqtSlot(str, object)
+    def on_config_changed(self, key_path: str, value):
+        """リアルタイム設定変更時の処理"""
+        self.log_panel.append_log(f"🔧 設定変更: {key_path} = {value}")
+        self.status_bar.showMessage(f"設定変更: {key_path}", 2000)
+    
     @pyqtSlot()
     def on_settings_updated(self):
-        """設定が更新された時の処理"""
+        """設定が更新された時の処理（下位互換性維持）"""
         self.log_panel.append_log("設定が更新されました。")
     
     @pyqtSlot(object, str, object)

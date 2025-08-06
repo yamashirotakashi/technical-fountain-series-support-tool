@@ -1,4 +1,5 @@
 """入力パネルモジュール"""
+from __future__ import annotations
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QTextEdit, QPushButton, QGroupBox)
 from PyQt6.QtCore import pyqtSignal, pyqtSlot

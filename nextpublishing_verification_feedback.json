@@ -1,0 +1,51 @@
+{
+  "verification_success": true,
+  "message": "アップロード成功 - URL: http://trial.nextpublishing.jp/rapture/",
+  "control_number": null,
+  "timestamp": 1735675853,
+  "test_results": {
+    "http_requests_approach": {
+      "status": "成功（ZIPファイルの場合）",
+      "details": [
+        "Basic認証: Base64エンコードヘッダーで成功",
+        "ファイルアップロード: multipart/form-dataで成功",
+        "成功判定: 同じURLで成功メッセージ表示を確認"
+      ]
+    },
+    "selenium_approach": {
+      "status": "タイムアウト（WSL環境の制限）",
+      "details": [
+        "ChromeDriverの初期化でタイムアウト",
+        "WSL環境でのheadlessブラウザ実行に問題"
+      ]
+    }
+  },
+  "implementation_recommendations": [
+    "ファイル形式の確認：ZIPファイルのみ受け付ける",
+    "HTTP Requestsアプローチで実装可能",
+    "Basic認証はBase64エンコードしたAuthorizationヘッダーで対応",
+    "成功判定は同じURLでHTMLコンテンツの変化を検出",
+    "文字エンコーディングに注意（UTF-8 BOMあり）",
+    "必須フィールド：userfile（ZIPファイル）、mail、mailconf"
+  ],
+  "code_snippets": {
+    "authentication": "credentials = f\"{username}:{password}\"\nencoded_credentials = base64.b64encode(credentials.encode()).decode()\nheaders['Authorization'] = f'Basic {encoded_credentials}'",
+    "file_upload": "files = {'userfile': (file_name, file_content, 'application/zip')}\ndata = {'mail': email, 'mailconf': email}\nresponse = session.post(url, files=files, data=data, headers=headers)",
+    "success_detection": "# 文字化けパターンも考慮\nsuccess_patterns = ['アップロード完了', 'ã¢ããã­ã¼ããå®äºãã¾ããã']\nfor pattern in success_patterns:\n    if pattern in response.text:\n        return True"
+  },
+  "technical_details": {
+    "endpoint": "http://trial.nextpublishing.jp/rapture/",
+    "method": "POST",
+    "content_type": "multipart/form-data",
+    "required_fields": {
+      "userfile": "ZIPファイル（application/zip）",
+      "mail": "メールアドレス",
+      "mailconf": "メールアドレス（確認用）"
+    },
+    "response": {
+      "success_status_code": 200,
+      "success_url": "同じURL（リダイレクトなし）",
+      "success_indicator": "HTMLコンテンツが成功メッセージに変化"
+    }
+  }
+}

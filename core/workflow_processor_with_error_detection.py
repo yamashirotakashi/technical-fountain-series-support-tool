@@ -1,4 +1,6 @@
 """エラー検知機能を統合したワークフロープロセッサー"""
+from __future__ import annotations
+
 import os
 import time
 from pathlib import Path
@@ -9,7 +11,7 @@ from PyQt6.QtCore import pyqtSignal
 from core.workflow_processor import WorkflowProcessor
 from services.nextpublishing_service import NextPublishingService
 from services.error_check_validator import ErrorCheckValidator
-from core.email_monitor_enhanced import EmailMonitorEnhanced
+from core.gmail_oauth_monitor import GmailOAuthMonitor
 from utils.logger import get_logger
 
 
@@ -177,8 +179,9 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
                 raise ValueError("変換ファイルのダウンロードに失敗しました")
         else:
             # 従来方式の処理
-            self.emit_log("従来方式で処理を開始...", "INFO")
-            upload_success = self.web_client.upload_file(zip_path, self.email_address)
+            mode_text = "Gmail API方式" if self.process_mode == "gmail_api" else "従来方式"
+            self.emit_log(f"{mode_text}で処理を開始...", "INFO")
+            upload_success = self.web_client.upload_file(zip_path, self.email_address, self.process_mode)
             
             if not upload_success:
                 raise ValueError("ファイルのアップロードに失敗しました")
@@ -244,48 +247,72 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
             
             # メール監視を初期化（Gmail API優先）
             email_monitor = None
+            
+            # Gmail API設定確認
+            gmail_api_enabled = self.config.get_email_config().get('use_gmail_api', False)
+            self.emit_log(f"Gmail API設定: {'有効' if gmail_api_enabled else '無効'}", "INFO")
+            
             if self.email_password:
-                # まずGmail APIを試行
-                try:
-                    from core.gmail_oauth_monitor import GmailOAuthMonitor
-                    from core.gmail_oauth_exe_helper import gmail_oauth_helper
-                    
-                    # 開発環境とEXE環境の両方に対応
-                    if gmail_oauth_helper.is_exe:
-                        # EXE環境: exe_helperを使用
-                        self.emit_log("EXE環境でGmail API認証をチェック中...", "DEBUG")
-                        credentials_path, token_path = gmail_oauth_helper.get_credentials_path()
-                        self.emit_log(f"認証ファイルパス: {credentials_path}", "DEBUG")
-                        
-                        if gmail_oauth_helper.check_credentials_exist():
-                            self.emit_log("Gmail APIを使用してメール監視を初期化します（EXE環境）", "INFO")
-                            # EXE環境では明示的にNoneを渡して内部でパス解決させる
-                            email_monitor = GmailOAuthMonitor(credentials_path=None, service_type='word2xhtml5')
-                            email_monitor.authenticate()
-                            self.emit_log("Gmail APIメール監視を有効化しました", "INFO")
-                        else:
-                            raise FileNotFoundError(f"OAuth2.0認証ファイルが見つかりません: {credentials_path}")
-                    else:
-                        # 開発環境: 従来のパスを使用
-                        gmail_credentials_path = Path("config/gmail_oauth_credentials.json")
-                        if not gmail_credentials_path.exists():
-                            alt_path = Path("config/gmail_credentials.json")
-                            if alt_path.exists():
-                                gmail_credentials_path = alt_path
-                        
-                        if gmail_credentials_path.exists():
-                            self.emit_log("Gmail APIを使用してメール監視を初期化します（開発環境）", "INFO")
-                            email_monitor = GmailOAuthMonitor(str(gmail_credentials_path), service_type='word2xhtml5')
-                            email_monitor.authenticate()
-                            self.emit_log("Gmail APIメール監視を有効化しました", "INFO")
-                        else:
-                            raise FileNotFoundError("OAuth2.0認証ファイルが見つかりません: config/gmail_oauth_credentials.json")
-                except Exception as e:
-                    # Gmail APIが使えない場合はIMAPにフォールバック
-                    import traceback
-                    self.emit_log(f"Gmail API初期化失敗、IMAPを使用します: {e}", "WARNING")
-                    self.emit_log(f"詳細エラー: {traceback.format_exc()}", "DEBUG")
+                # Gmail API設定チェック
+                if gmail_api_enabled:
+                    # Gmail APIを試行
                     try:
+                        from core.gmail_oauth_monitor import GmailOAuthMonitor
+                        from core.gmail_oauth_exe_helper import gmail_oauth_helper
+                        
+                        self.emit_log("Gmail API初期化を開始します", "INFO")
+                        
+                        # 開発環境とEXE環境の両方に対応
+                        if gmail_oauth_helper.is_exe:
+                            # EXE環境: exe_helperを使用
+                            self.emit_log("EXE環境でGmail API認証をチェック中...", "DEBUG")
+                            credentials_path, token_path = gmail_oauth_helper.get_credentials_path()
+                            self.emit_log(f"認証ファイルパス: {credentials_path}", "DEBUG")
+                            self.emit_log(f"トークンファイルパス: {token_path}", "DEBUG")
+                            
+                            if gmail_oauth_helper.check_credentials_exist():
+                                self.emit_log("Gmail APIを使用してメール監視を初期化します（EXE環境）", "INFO")
+                                # EXE環境では明示的にNoneを渡して内部でパス解決させる
+                                email_monitor = GmailOAuthMonitor(credentials_path=None, service_type='word2xhtml5')
+                                email_monitor.authenticate()
+                                self.emit_log("Gmail APIメール監視を有効化しました", "INFO")
+                            else:
+                                raise FileNotFoundError(f"OAuth2.0認証ファイルが見つかりません: {credentials_path}")
+                        else:
+                            # 開発環境: 設定ファイルからパスを取得
+                            config_credentials_path = self.config.get_email_config().get('gmail_credentials_path')
+                            if config_credentials_path:
+                                gmail_credentials_path = Path(config_credentials_path)
+                                self.emit_log(f"設定からの認証ファイルパス: {gmail_credentials_path}", "DEBUG")
+                            else:
+                                gmail_credentials_path = Path("config/gmail_oauth_credentials.json")
+                                
+                            if not gmail_credentials_path.exists():
+                                alt_path = Path("config/gmail_credentials.json")
+                                if alt_path.exists():
+                                    gmail_credentials_path = alt_path
+                                    self.emit_log(f"代替認証ファイルパス使用: {gmail_credentials_path}", "DEBUG")
+                            
+                            if gmail_credentials_path.exists():
+                                self.emit_log("Gmail APIを使用してメール監視を初期化します（開発環境）", "INFO")
+                                self.emit_log(f"使用する認証ファイル: {gmail_credentials_path}", "DEBUG")
+                                email_monitor = GmailOAuthMonitor(str(gmail_credentials_path), service_type='word2xhtml5')
+                                email_monitor.authenticate()
+                                self.emit_log("Gmail APIメール監視を有効化しました", "INFO")
+                            else:
+                                raise FileNotFoundError(f"OAuth2.0認証ファイルが見つかりません: {gmail_credentials_path}")
+                    except Exception as e:
+                        # Gmail APIが使えない場合はIMAPにフォールバック
+                        import traceback
+                        self.emit_log(f"Gmail API初期化失敗、IMAPを使用します: {e}", "WARNING")
+                        self.emit_log(f"詳細エラー: {traceback.format_exc()}", "DEBUG")
+                        gmail_api_enabled = False  # フォールバック時は無効扱い
+                
+                # Gmail APIが無効またはフォールバック時はIMAPを使用
+                if not gmail_api_enabled or not email_monitor:
+                    self.emit_log("IMAPメール監視に切り替えます", "INFO")
+                    try:
+                        from core.email_monitor_enhanced import EmailMonitorEnhanced
                         email_monitor = EmailMonitorEnhanced(
                             email_address=self.email_address,
                             password=self.email_password,
@@ -294,7 +321,8 @@ class WorkflowProcessorWithErrorDetection(WorkflowProcessor):
                         email_monitor.connect()
                         self.emit_log("IMAPメール監視を有効化しました", "INFO")
                     except Exception as e2:
-                        self.emit_log(f"メール監視の初期化に失敗: {e2}", "WARNING")
+                        self.emit_log(f"IMAPメール監視の初期化に失敗: {e2}", "WARNING")
+                        email_monitor = None
             
             error_files = []
             total_files = len(word_files)

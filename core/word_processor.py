@@ -1,4 +1,5 @@
-﻿"""Word文書処理モジュール"""
+from __future__ import annotations
+"""Word文書処理モジュール"""
 import zipfile
 import tempfile
 from pathlib import Path
@@ -6,14 +7,23 @@ from typing import List, Optional
 import docx
 
 from utils.logger import get_logger
+from core.di_container import inject
+from core.configuration_provider import ConfigurationProvider
 
 
 class WordProcessor:
     """Word文書を処理するクラス"""
     
-    def __init__(self):
-        """WordProcessorを初期化"""
+    @inject
+    def __init__(self, config_provider: ConfigurationProvider):
+        """
+        WordProcessorを初期化
+        
+        Args:
+            config_provider: 統一設定プロバイダー（DI注入）
+        """
         self.logger = get_logger(__name__)
+        self.config_provider = config_provider
     
     def process_word_files(self, folder_path: Path) -> int:
         """
@@ -189,7 +199,45 @@ class WordProcessor:
         Returns:
             見つかったNフォルダのパス、見つからない場合はNone
         """
-        base_path = Path("G:/.shortcut-targets-by-id/0B6euJ_grVeOeMnJLU1IyUWgxeWM/NP-IRD")
+        # ConfigManagerから設定を取得
+        if self.config_manager:
+            try:
+                base_path_str = self.config_manager.get('paths.ncode_base_path')
+                if base_path_str:
+                    base_path = Path(base_path_str)
+                    self.logger.info(f"ConfigManagerからNコードベースパスを取得: {base_path}")
+                else:
+                    # 環境変数からのフォールバック
+                    env_path = os.environ.get('TECHZIP_NCODE_BASE_PATH')
+                    if env_path:
+                        base_path = Path(env_path)
+                        self.logger.info(f"環境変数からNコードベースパスを取得: {base_path}")
+                    else:
+                        raise ValueError("Nコードベースパスが設定されていません")
+            except Exception as e:
+                self.logger.error(f"ConfigManagerからの設定取得に失敗: {e}")
+                # 環境変数からの最終フォールバック
+                env_path = os.environ.get('TECHZIP_NCODE_BASE_PATH')
+                if env_path:
+                    base_path = Path(env_path)
+                    self.logger.warning(f"環境変数からフォールバック: {base_path}")
+                else:
+                    raise ValueError(
+                        "Nコードベースパスが設定されていません。"
+                        "ConfigManagerまたは環境変数TECHZIP_NCODE_BASE_PATHを設定してください。"
+                    )
+        else:
+            # ConfigManagerが利用できない場合は環境変数を確認
+            env_path = os.environ.get('TECHZIP_NCODE_BASE_PATH')
+            if env_path:
+                base_path = Path(env_path)
+                self.logger.info(f"ConfigManager未利用、環境変数から取得: {base_path}")
+            else:
+                raise ValueError(
+                    "ConfigManagerが未初期化で、環境変数TECHZIP_NCODE_BASE_PATHも設定されていません。"
+                    "設定を確認してください。"
+                )
+        
         ncode_folder = base_path / ncode
         
         if ncode_folder.exists() and ncode_folder.is_dir():
@@ -209,7 +257,25 @@ class WordProcessor:
         Returns:
             見つかった本文フォルダのパス、見つからない場合はNone
         """
-        honbun_folder = ncode_folder / "本文"
+        # ConfigManagerから設定を取得、失敗時はデフォルト値を使用
+        if self.config_manager:
+            try:
+                honbun_folder_name = self.config_manager.get('folders.honbun_folder_name')
+                if honbun_folder_name:
+                    self.logger.info(f"ConfigManagerから本文フォルダ名を取得: {honbun_folder_name}")
+                else:
+                    # 設定が空の場合はデフォルト値
+                    honbun_folder_name = "本文"
+                    self.logger.info("ConfigManagerの設定が空のため、デフォルト本文フォルダ名を使用")
+            except Exception as e:
+                self.logger.warning(f"ConfigManagerからの設定取得に失敗: {e}")
+                honbun_folder_name = "本文"
+        else:
+            # ConfigManagerが利用できない場合はデフォルト値
+            honbun_folder_name = "本文"
+            self.logger.info("ConfigManager未利用のため、デフォルト本文フォルダ名を使用")
+        
+        honbun_folder = ncode_folder / honbun_folder_name
         
         if honbun_folder.exists() and honbun_folder.is_dir():
             self.logger.info(f"本文フォルダ発見: {honbun_folder}")

@@ -1,4 +1,5 @@
 """シンプルな警告ダイアログ（MessageBoxベース）"""
+from __future__ import annotations
 from PyQt6.QtWidgets import QMessageBox, QTextEdit, QVBoxLayout
 from PyQt6.QtCore import Qt
 

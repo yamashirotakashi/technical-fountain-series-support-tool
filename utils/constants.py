@@ -1,3 +1,4 @@
+from __future__ import annotations
 """定数定義モジュール"""
 
 # メール送信者アドレス

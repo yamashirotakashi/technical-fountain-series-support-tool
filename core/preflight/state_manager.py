@@ -1,17 +1,38 @@
 """Pre-flight Check状態管理モジュール"""
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from utils.logger import get_logger
 
+# ConfigManagerをインポート
+try:
+    from src.slack_pdf_poster import ConfigManager
+except ImportError:
+    ConfigManager = None
+
 
 class PreflightStateManager:
     """Pre-flight Checkの状態を管理"""
     
-    def __init__(self):
+    def __init__(self, config_manager: Optional['ConfigManager'] = None):
+        """
+        Args:
+            config_manager: 設定管理インスタンス
+        """
         self.logger = get_logger(__name__)
-        self.state_dir = Path.home() / ".techzip" / "preflight_state"
+        self.config_manager = config_manager or (ConfigManager() if ConfigManager else None)
+        
+        # ConfigManagerからキャッシュディレクトリを取得
+        if self.config_manager:
+            cache_base = self.config_manager.get("paths.cache_directory", str(Path.home() / ".techzip"))
+        else:
+            cache_base = str(Path.home() / ".techzip")
+            self.logger.warning("ConfigManagerが利用できません。デフォルトキャッシュパスを使用します。")
+        
+        self.state_dir = Path(cache_base) / "preflight_state"
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.current_state_file = self.state_dir / "current_state.json"
         

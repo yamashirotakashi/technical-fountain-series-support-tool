@@ -1,4 +1,6 @@
 """Word文書ファイルの検証モジュール"""
+from __future__ import annotations
+
 import os
 import zipfile
 import mimetypes
@@ -7,6 +9,10 @@ from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
 
 from utils.logger import get_logger
+
+# Configuration Provider統合
+from core.configuration_provider import ConfigurationProvider
+from core.di_container import inject
 
 
 @dataclass
@@ -33,9 +39,22 @@ class ValidationResult:
 class WordFileValidator:
     """Word文書ファイルの安全性検証クラス"""
     
-    # ファイルサイズ制限
-    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
-    MIN_FILE_SIZE = 512  # 512 bytes（テスト用DOCXファイルを考慮）
+    @inject
+    def __init__(self, config_provider: ConfigurationProvider):
+        """
+        Word文書ファイル検証システムを初期化
+        
+        Args:
+            config_provider: 統一設定プロバイダー（DI注入）
+        """
+        self.logger = get_logger(__name__)
+        self.config_provider = config_provider
+        
+        # ConfigurationProviderからファイルサイズ制限を取得
+        self.MAX_FILE_SIZE = self.config_provider.get("validation.max_file_size", 50 * 1024 * 1024)  # デフォルト50MB
+        self.MIN_FILE_SIZE = self.config_provider.get("validation.min_file_size", 512)  # デフォルト512 bytes
+        
+        self.logger.info(f"ファイルサイズ制限: {self.MIN_FILE_SIZE} - {self.MAX_FILE_SIZE:,} bytes")
     
     # 許可されるMIMEタイプ
     ALLOWED_MIME_TYPES = {
@@ -60,9 +79,6 @@ class WordFileValidator:
         'https://',
     ]
     
-    def __init__(self):
-        self.logger = get_logger(__name__)
-        
     def validate_single(self, file_path: str) -> ValidationResult:
         """単一ファイルの検証
         

@@ -1,10 +1,18 @@
 """検証戦略パターンの実装"""
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
 from .file_validator import ValidationResult
+
+# ConfigManagerをインポート
+try:
+    from src.slack_pdf_poster import ConfigManager
+except ImportError:
+    ConfigManager = None
 
 
 class VerificationMode(Enum):
@@ -25,12 +33,26 @@ class VerificationConfig:
     max_file_size_mb: int = 50
     allowed_extensions: List[str] = None
     custom_patterns: List[str] = None
+    config_manager: Optional['ConfigManager'] = None
     
     def __post_init__(self):
         if self.allowed_extensions is None:
-            self.allowed_extensions = ['.docx', '.doc']
+            if self.config_manager:
+                extensions_str = self.config_manager.get('validation.allowed_extensions', '.docx,.doc')
+                self.allowed_extensions = [ext.strip() for ext in extensions_str.split(',')]
+            else:
+                self.allowed_extensions = ['.docx', '.doc']
+        
         if self.custom_patterns is None:
-            self.custom_patterns = []
+            if self.config_manager:
+                patterns_str = self.config_manager.get('validation.custom_patterns', '')
+                self.custom_patterns = [pattern.strip() for pattern in patterns_str.split(',') if pattern.strip()]
+            else:
+                self.custom_patterns = []
+        
+        # ConfigManagerからファイルサイズ制限を更新
+        if self.config_manager and hasattr(self, 'max_file_size_mb'):
+            self.max_file_size_mb = self.config_manager.get('validation.max_file_size_mb', self.max_file_size_mb)
 
 
 @dataclass
@@ -106,7 +128,7 @@ class QuickVerificationStrategy(VerificationStrategy):
         from .file_validator import WordFileValidator
         
         start_time = time.time()
-        validator = WordFileValidator()
+        validator = WordFileValidator(self.config.config_manager)
         
         # 最低限の検証のみ実行
         file_results = {}
@@ -187,7 +209,7 @@ class StandardVerificationStrategy(VerificationStrategy):
         from .file_validator import WordFileValidator
         
         start_time = time.time()
-        validator = WordFileValidator()
+        validator = WordFileValidator(self.config.config_manager)
         
         # 通常の検証を実行
         file_results = validator.validate_batch(file_paths)
@@ -226,7 +248,7 @@ class ThoroughVerificationStrategy(VerificationStrategy):
         from .file_validator import WordFileValidator
         
         start_time = time.time()
-        validator = WordFileValidator()
+        validator = WordFileValidator(self.config.config_manager)
         
         # 標準検証 + 追加セキュリティチェック
         file_results = validator.validate_batch(file_paths)
@@ -322,7 +344,7 @@ class CustomVerificationStrategy(VerificationStrategy):
         from .file_validator import WordFileValidator
         
         start_time = time.time()
-        validator = WordFileValidator()
+        validator = WordFileValidator(self.config.config_manager)
         
         # 基本検証を実行
         file_results = validator.validate_batch(file_paths)

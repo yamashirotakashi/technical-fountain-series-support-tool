@@ -1,4 +1,5 @@
 """拡張メール監視モジュール（Word2XHTML5対応）"""
+from __future__ import annotations
 import imaplib
 import email
 import re

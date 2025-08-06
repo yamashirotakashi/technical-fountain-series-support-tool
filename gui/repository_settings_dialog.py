@@ -1,4 +1,5 @@
-﻿"""繝ｪ繝昴ず繝医Μ險ｭ螳壹ム繧､繧｢繝ｭ繧ｰ繝｢繧ｸ繝･繝ｼ繝ｫ"""
+from __future__ import annotations
+"""リポジトリ設定ダイアログ"""
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGroupBox,
     QLabel, QLineEdit, QPushButton, QCheckBox,
@@ -12,7 +13,7 @@ from core.git_repository_manager import GitRepositoryManager
 
 
 class RepositorySettingsDialog(QDialog):
-    """繝ｪ繝昴ず繝医Μ險ｭ螳壹ｒ邂｡逅・☆繧九ム繧､繧｢繝ｭ繧ｰ"""
+    """リポジトリ設定を管理するダイアログ"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -23,39 +24,41 @@ class RepositorySettingsDialog(QDialog):
         self.load_settings()
     
     def init_ui(self):
-        """UI繧貞・譛溷喧"""
-        self.setWindowTitle("繝ｪ繝昴ず繝医Μ險ｭ螳・)
+        """UIを初期化"""
+        self.setWindowTitle("リポジトリ設定")
         self.setMinimumWidth(600)
         
         layout = QVBoxLayout()
         
-        # GitHub險ｭ螳壹げ繝ｫ繝ｼ繝・        github_group = QGroupBox("GitHub險ｭ螳・)
+        # GitHub設定グループ
+        github_group = QGroupBox("GitHub設定")
         github_layout = QVBoxLayout()
         
-        # GitHub繝ｦ繝ｼ繧ｶ繝ｼ蜷・        user_layout = QHBoxLayout()
-        user_layout.addWidget(QLabel("GitHub繝ｦ繝ｼ繧ｶ繝ｼ:"))
+        # GitHubユーザー名
+        user_layout = QHBoxLayout()
+        user_layout.addWidget(QLabel("GitHubユーザー:"))
         self.github_user_edit = QLineEdit()
         user_layout.addWidget(self.github_user_edit)
         github_layout.addLayout(user_layout)
         
-        # GitHub繝医・繧ｯ繝ｳ
+        # GitHubトークン
         token_layout = QHBoxLayout()
-        token_layout.addWidget(QLabel("GitHub繝医・繧ｯ繝ｳ:"))
+        token_layout.addWidget(QLabel("GitHubトークン:"))
         self.github_token_edit = QLineEdit()
         self.github_token_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        self.github_token_edit.setPlaceholderText("繧ｪ繝励す繝ｧ繝ｳ・医・繝ｩ繧､繝吶・繝医Μ繝昴ず繝医Μ逕ｨ・・)
+        self.github_token_edit.setPlaceholderText("環境変数GITHUB_TOKENまたは直接入力")
         token_layout.addWidget(self.github_token_edit)
         github_layout.addLayout(token_layout)
         
-        # 繝ｪ繝｢繝ｼ繝亥━蜈医メ繧ｧ繝・け繝懊ャ繧ｯ繧ｹ
-        self.use_remote_check = QCheckBox("繝ｪ繝｢繝ｼ繝医Μ繝昴ず繝医Μ繧貞━蜈育噪縺ｫ菴ｿ逕ｨ")
+        # リモートリポジトリ使用オプション
+        self.use_remote_check = QCheckBox("リモートリポジトリを使用する")
         self.use_remote_check.setChecked(True)
         github_layout.addWidget(self.use_remote_check)
         
         github_group.setLayout(github_layout)
         layout.addWidget(github_group)
         
-        # 繝ｭ繝ｼ繧ｫ繝ｫ險ｭ螳壹げ繝ｫ繝ｼ繝・        local_group = QGroupBox("繝ｭ繝ｼ繧ｫ繝ｫ險ｭ螳・)
+        # 繝ｭ繝ｼ繧ｫ繝ｫ險ｭ螳壹げ繝ｫ繝ｼ繝・        local_group = QGroupBox("ローカル設定")
         local_layout = QVBoxLayout()
         
         # Google Drive繝代せ
@@ -71,7 +74,7 @@ class RepositorySettingsDialog(QDialog):
         local_group.setLayout(local_layout)
         layout.addWidget(local_group)
         
-        # 繧ｭ繝｣繝・す繝･諠・ｱ繧ｰ繝ｫ繝ｼ繝・        cache_group = QGroupBox("繧ｭ繝｣繝・す繝･諠・ｱ")
+        # 繧ｭ繝｣繝・す繝･諠・ｱ繧ｰ繝ｫ繝ｼ繝・        cache_group = QGroupBox("キャッシュ情報")
         cache_layout = QVBoxLayout()
         
         self.cache_info_text = QTextEdit()
@@ -95,15 +98,15 @@ class RepositorySettingsDialog(QDialog):
         # 繝懊ち繝ｳ
         button_layout = QHBoxLayout()
         
-        test_button = QPushButton("謗･邯壹ユ繧ｹ繝・)
+        test_button = QPushButton("接続テスト")
         test_button.clicked.connect(self.test_connection)
         button_layout.addWidget(test_button)
         
-        save_button = QPushButton("菫晏ｭ・)
+        save_button = QPushButton("保存")
         save_button.clicked.connect(self.save_settings)
         button_layout.addWidget(save_button)
         
-        cancel_button = QPushButton("繧ｭ繝｣繝ｳ繧ｻ繝ｫ")
+        cancel_button = QPushButton("キャンセル")
         cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(cancel_button)
         

@@ -1,4 +1,6 @@
-﻿"""ReVIEW変換API処理モジュール"""
+from __future__ import annotations
+"""ReVIEW変換API処理モジュール"""
+import os
 import requests
 from requests.auth import HTTPBasicAuth
 import time
@@ -13,6 +15,10 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from utils.logger import get_logger
 
+# Phase 3-2: DI Container統合によりConfigManager条件分岐import完全解消
+from core.configuration_provider import ConfigurationProvider
+from core.di_container import inject
+
 
 class ApiProcessor(QObject):
     """API方式での変換処理を行うクラス"""
@@ -23,21 +29,43 @@ class ApiProcessor(QObject):
     status_updated = pyqtSignal(str)  # status
     warning_dialog_needed = pyqtSignal(list, str)  # messages, result_type
     
-    # API設定
-    API_BASE_URL = "http://sd001.nextpublishing.jp/rapture"
-    API_USERNAME = "ep_user"
-    API_PASSWORD = "Nn7eUTX5"
-    
-    # タイムアウト設定
-    UPLOAD_TIMEOUT = 300  # 5分
-    STATUS_CHECK_TIMEOUT = 30
-    DOWNLOAD_TIMEOUT = 300  # 5分
-    MAX_POLLING_ATTEMPTS = 60  # 最大10分間（10秒間隔）
-    POLLING_INTERVAL = 10  # 10秒
-    
-    def __init__(self):
+    @inject
+    def __init__(self, config_provider: ConfigurationProvider):
+        """
+        Phase 3-2: Constructor Injection適用
+        
+        Args:
+            config_provider: DI注入される統一設定プロバイダー
+        """
         super().__init__()
         self.logger = get_logger(__name__)
+        self.config_provider = config_provider
+        
+        # 統一設定プロバイダーから設定を取得
+        self.API_BASE_URL = (
+            self.config_provider.get("api.nextpublishing.api_base_url") or
+            self.config_provider.get("api.nextpublishing.base_url") or
+            os.getenv("NEXTPUB_API_BASE_URL") or
+            "http://sd001.nextpublishing.jp/rapture"
+        )
+        
+        # 認証情報
+        self.API_USERNAME = (
+            self.config_provider.get("api.nextpublishing.username") or
+            os.getenv('NEXTPUB_USERNAME', 'ep_user')
+        )
+        self.API_PASSWORD = (
+            self.config_provider.get("api.nextpublishing.password") or
+            os.getenv('NEXTPUB_PASSWORD', 'Nn7eUTX5')
+        )
+        
+        # タイムアウト設定
+        self.UPLOAD_TIMEOUT = self.config_provider.get("api.nextpublishing.upload_timeout", 300)
+        self.STATUS_CHECK_TIMEOUT = self.config_provider.get("api.nextpublishing.timeout", 30)
+        self.DOWNLOAD_TIMEOUT = self.config_provider.get("api.nextpublishing.download_timeout", 300)
+        self.MAX_POLLING_ATTEMPTS = self.config_provider.get("processing.max_polling_attempts", 60)
+        self.POLLING_INTERVAL = self.config_provider.get("processing.polling_interval", 10)
+        
         self.auth = HTTPBasicAuth(self.API_USERNAME, self.API_PASSWORD)
     
     def strip_ansi_escape_sequences(self, text: str) -> str:
@@ -48,6 +76,33 @@ class ApiProcessor(QObject):
         # ANSIエスケープシーケンスのパターン
         ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
         return ansi_escape.sub('', text)
+    
+    def _detect_server_error_response(self, response) -> Tuple[bool, Optional[str]]:
+        """
+        サーバーサイド設定エラーの検出
+        
+        Args:
+            response: HTTP response object
+            
+        Returns:
+            (エラー検出フラグ, エラーメッセージ) のタプル
+        """
+        if response.status_code == 200:
+            content = response.text.strip()
+            
+            # PHP警告・エラーメッセージの検出（優先）
+            if any(error_pattern in content for error_pattern in ['Warning:', 'Error:', 'Fatal error:', 'include(application/errors/']):
+                return True, "サーバーサイドPHP設定エラーが検出されました"
+            
+            # HTML/PHP エラーレスポンスの検出（PHPエラーが含まれていない場合）
+            if content.startswith('<'):
+                return True, "サーバーがHTML形式のエラーを返しました（API設定問題）"
+            
+            # 空のレスポンス
+            if len(content) == 0:
+                return True, "サーバーから空のレスポンスが返されました"
+        
+        return False, None
     
     def upload_zip(self, zip_path: Path) -> Optional[str]:
         """
@@ -62,7 +117,10 @@ class ApiProcessor(QObject):
         file_size = zip_path.stat().st_size
         self.log_message.emit(f"ファイルをアップロード中: {zip_path.name}", "INFO")
         self.log_message.emit(f"ファイルサイズ: {file_size:,} bytes ({file_size / 1024 / 1024:.1f} MB)", "INFO")
-        self.log_message.emit(f"API URL: {self.API_BASE_URL}/api/upload", "DEBUG")
+        
+        # URLを適切に結合（二重スラッシュを防ぐ）
+        api_url = self.API_BASE_URL.rstrip('/') + '/api/upload'
+        self.log_message.emit(f"API URL: {api_url}", "DEBUG")
         
         # プログレスバーを0%に初期化
         self.progress_updated.emit(0)
@@ -124,7 +182,7 @@ class ApiProcessor(QObject):
                     self.log_message.emit(f"アップロードサイズ: {encoder_len:,} bytes", "DEBUG")
                     
                     response = requests.post(
-                        f"{self.API_BASE_URL}/api/upload",
+                        api_url,
                         data=monitor,
                         headers={'Content-Type': monitor.content_type},
                         auth=self.auth,
@@ -159,7 +217,7 @@ class ApiProcessor(QObject):
                     self.log_message.emit("アップロード開始", "INFO")
                     
                     response = requests.post(
-                        f"{self.API_BASE_URL}/api/upload",
+                        api_url,
                         files=files,
                         auth=self.auth,
                         timeout=self.UPLOAD_TIMEOUT
@@ -175,13 +233,27 @@ class ApiProcessor(QObject):
                 self.log_message.emit("アップロード完了", "INFO")
             
             if response.status_code == 200:
-                data = response.json()
-                if 'jobid' in data:
-                    jobid = data['jobid']
-                    self.log_message.emit(f"アップロード成功 (Job ID: {jobid})", "INFO")
-                    return jobid
-                else:
-                    self.log_message.emit("レスポンスにJob IDが含まれていません", "ERROR")
+                # サーバーエラー検出
+                has_error, error_msg = self._detect_server_error_response(response)
+                if has_error:
+                    self.log_message.emit(f"API SERVER ERROR: {error_msg}", "ERROR")
+                    self.log_message.emit("NextPublishing APIサーバーに設定問題があります", "ERROR")
+                    self.log_message.emit(f"レスポンス内容: {response.text[:200]}", "DEBUG")
+                    self.log_message.emit("メールベースワークフローに切り替えることを推奨", "WARNING")
+                    return None
+                
+                try:
+                    data = response.json()
+                    if 'jobid' in data:
+                        jobid = data['jobid']
+                        self.log_message.emit(f"アップロード成功 (Job ID: {jobid})", "INFO")
+                        return jobid
+                    else:
+                        self.log_message.emit("レスポンスにJob IDが含まれていません", "ERROR")
+                except ValueError as e:
+                    self.log_message.emit(f"JSONパースエラー: {str(e)}", "ERROR")
+                    self.log_message.emit(f"レスポンス内容: {response.text[:200]}", "DEBUG")
+                    self.log_message.emit("サーバーから無効なJSON応答が返されました", "ERROR")
             else:
                 self.log_message.emit(
                     f"アップロード失敗 (HTTP {response.status_code})", 
@@ -211,12 +283,15 @@ class ApiProcessor(QObject):
             結果は 'success', 'partial_success', 'failure', None のいずれか
         """
         self.log_message.emit("変換処理の完了を待機中...", "INFO")
-        self.log_message.emit(f"ステータス確認URL: {self.API_BASE_URL}/api/status/{jobid}", "DEBUG")
+        
+        # ステータス確認URLを適切に構築
+        status_url = self.API_BASE_URL.rstrip('/') + f'/api/status/{jobid}'
+        self.log_message.emit(f"ステータス確認URL: {status_url}", "DEBUG")
         
         for attempt in range(self.MAX_POLLING_ATTEMPTS):
             try:
                 response = requests.get(
-                    f"{self.API_BASE_URL}/api/status/{jobid}",
+                    status_url,
                     auth=self.auth,
                     timeout=self.STATUS_CHECK_TIMEOUT
                 )
@@ -224,6 +299,14 @@ class ApiProcessor(QObject):
                 self.log_message.emit(f"ステータス確認 - HTTP Status: {response.status_code}", "DEBUG")
                 
                 if response.status_code == 200:
+                    # サーバーエラー検出
+                    has_error, error_msg = self._detect_server_error_response(response)
+                    if has_error:
+                        self.log_message.emit(f"STATUS CHECK SERVER ERROR: {error_msg}", "ERROR")
+                        self.log_message.emit("ステータス確認でサーバー設定問題を検出", "ERROR")
+                        self.log_message.emit(f"レスポンス内容: {response.text[:200]}", "DEBUG")
+                        return 'failure', None, [f"サーバー設定エラー: {error_msg}"]
+                    
                     # レスポンスの内容を確認
                     try:
                         response_text = response.text
@@ -289,6 +372,46 @@ class ApiProcessor(QObject):
                             errors = data.get('errors', [])
                             self.log_message.emit("変換処理が失敗しました", "ERROR")
                             self.log_message.emit(f"エラー数: {len(errors)}", "DEBUG")
+                            
+                            # JSON content-level error detection for server-side issues
+                            output_content = data.get('output', '')
+                            if output_content:
+                                # Check for server-specific error patterns in output content
+                                server_error_patterns = [
+                                    'Warning:',           # PHP Warning はサーバーエラー  
+                                    'Error:',             # PHP Error はサーバーエラー
+                                    'Fatal error:',       # PHP Fatal Error はサーバーエラー
+                                    'include(application/errors/',
+                                    'PHP Warning',
+                                    'PHP Error'
+                                ]
+                                
+                                if any(pattern in str(output_content) for pattern in server_error_patterns):
+                                    self.log_message.emit("JSON content-level server error detected", "ERROR")
+                                    self.log_message.emit(f"Server error pattern found in output: {output_content[:200]}", "DEBUG")
+                                    self._show_server_error_guidance("JSON content server error")
+                                    return 'failure', None, [f"サーバー設定エラー: {str(output_content)[:100]}"]
+                                
+                            # review compile段階の詳細ログ（正常な処理ステップとして扱う）
+                            if 'review compile' in str(output_content):
+                                self.log_message.emit("Review compile段階を検出", "INFO")
+                                self.log_message.emit(f"Review compile詳細: {str(output_content)[:500]}", "DEBUG")
+                                
+                                # review compile 固有のエラーパターンをチェック
+                                review_error_patterns = [
+                                    'review compile failed',
+                                    'compile error', 
+                                    'syntax error',
+                                    'compilation failed'
+                                ]
+                                
+                                review_has_error = any(pattern in str(output_content).lower() for pattern in review_error_patterns)
+                                if review_has_error:
+                                    self.log_message.emit("Review compile でエラーを検出", "ERROR")
+                                    return 'failure', None, [f"Review compileエラー: {str(output_content)[:200]}"]
+                                else:
+                                    self.log_message.emit("Review compile は正常に実行中", "INFO")
+                            
                             if errors:
                                 for error in errors:
                                     self.log_message.emit(f"  - {error}", "ERROR")
@@ -390,6 +513,28 @@ class ApiProcessor(QObject):
         
         return None
     
+    def _show_server_error_guidance(self, error_type: str):
+        """
+        サーバーエラー時のユーザーガイダンス表示
+        
+        Args:
+            error_type: エラーの種類
+        """
+        self.log_message.emit("=== API サーバーエラー対処法 ===", "WARNING")
+        
+        if "PHP" in error_type or "設定" in error_type:
+            self.log_message.emit("🔴 NextPublishing APIサーバーに設定問題があります", "ERROR")
+            self.log_message.emit("", "INFO")
+            self.log_message.emit("📋 推奨対処法：", "WARNING")
+            self.log_message.emit("1. メールベース変換ワークフローに切り替え", "INFO")
+            self.log_message.emit("2. NextPublishing技術サポートに連絡", "INFO")
+            self.log_message.emit("3. しばらく時間をおいてAPI再試行", "INFO")
+            self.log_message.emit("", "INFO")
+            self.log_message.emit("💡 メールワークフローは設定画面から変更可能", "INFO")
+            self.log_message.emit("   (ツール → 設定 → 変換方法 → メール方式)", "INFO")
+        
+        self.log_message.emit("================================", "WARNING")
+    
     def process_zip_file(self, zip_path: Path) -> Tuple[bool, Optional[Path], List[str]]:
         """
         ZIPファイルをAPI経由で処理
@@ -414,7 +559,11 @@ class ApiProcessor(QObject):
             if not jobid:
                 self.log_message.emit("アップロードが失敗しました", "ERROR")
                 self.log_message.emit("upload_zipがNoneを返しました", "ERROR")
-                return False, None, ["ファイルのアップロードに失敗しました"]
+                
+                # サーバーエラーの可能性を考慮してガイダンスを表示
+                self._show_server_error_guidance("API アップロードエラー")
+                
+                return False, None, ["APIアップロードに失敗しました。メールベースワークフローをお試しください。"]
             
             self.log_message.emit(f"アップロード成功 - Job ID: {jobid}", "INFO")
             
@@ -429,6 +578,11 @@ class ApiProcessor(QObject):
             if result == 'failure' or not download_url:
                 # 失敗の場合もエラーダイアログを表示
                 self.log_message.emit(f"処理失敗: result={result}, download_url={download_url}", "ERROR")
+                
+                # サーバーエラーが原因の場合はガイダンスを表示
+                if messages and any("サーバー設定エラー" in str(msg) for msg in messages):
+                    self._show_server_error_guidance("サーバー設定エラー")
+                
                 if messages:
                     self.log_message.emit(f"エラーメッセージ: {messages[:3]}", "ERROR")
                     self.log_message.emit(f"エラーダイアログを表示: {len(messages)}件のメッセージ", "ERROR")

@@ -1,4 +1,5 @@
-﻿"""ログ管理モジュール"""
+from __future__ import annotations
+"""ログ管理モジュール"""
 import logging
 import os
 from datetime import datetime

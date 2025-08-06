@@ -1,4 +1,5 @@
-﻿"""フォルダ選択ダイアログ"""
+from __future__ import annotations
+"""フォルダ選択ダイアログ"""
 import json
 import os
 from pathlib import Path
@@ -58,11 +59,17 @@ class FolderSelectorDialog(QDialog):
         # メインレイアウト
         main_layout = QVBoxLayout(self)
         
-        # 説明ラベル
-        info_label = QLabel(
-            "Re:VIEW関連ファイル（.re, config.yml, catalog.yml）が含まれるフォルダを選択してください。"
-        )
+        # 説明ラベル（よりユーザーフレンドリーに）
+        info_text = f"リポジトリ: {self.repo_name}\n"
+        if self.default_folder:
+            info_text += f"推奨フォルダ: {self.default_folder.name}\n"
+        info_text += "Re:VIEW関連ファイル（.re, config.yml, catalog.yml）が含まれるフォルダを選択してください。"
+        
+        info_label = QLabel(info_text)
         info_label.setWordWrap(True)
+        font = QFont()
+        font.setPointSize(10)
+        info_label.setFont(font)
         main_layout.addWidget(info_label)
         
         # スプリッター（ツリーとプレビュー）
@@ -108,6 +115,12 @@ class FolderSelectorDialog(QDialog):
         
         # ボタンエリア
         button_layout = QHBoxLayout()
+        
+        # 自動選択ボタン（推奨フォルダがある場合）
+        if self.default_folder:
+            self.auto_select_button = QPushButton(f"推奨フォルダを使用({self.default_folder.name})")
+            self.auto_select_button.clicked.connect(self._on_auto_select_clicked)
+            button_layout.addWidget(self.auto_select_button)
         
         self.change_button = QPushButton("変更")
         self.change_button.setEnabled(False)
@@ -275,6 +288,15 @@ class FolderSelectorDialog(QDialog):
         # 選択を確定（ダイアログは閉じない）
         self.path_label.setText(f"✓ {str(self.selected_folder)}")
         QMessageBox.information(self, "確認", "フォルダが変更されました。")
+    
+    def _on_auto_select_clicked(self):
+        """自動選択ボタンクリック時"""
+        if self.default_folder:
+            self.selected_folder = self.default_folder
+            self._select_folder_in_tree(self.default_folder)
+            self._update_preview()
+            # 自動選択後はすぐに確認
+            self._on_confirm_clicked()
     
     def _on_confirm_clicked(self):
         """Zip作成ボタンクリック時"""

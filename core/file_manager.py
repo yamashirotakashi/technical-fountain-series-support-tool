@@ -1,4 +1,7 @@
-﻿"""ファイル操作管理モジュール"""
+from __future__ import annotations
+"""ファイル操作管理モジュール"""
+
+# ConfigManagerファイル作成のマーカー - config_manager.py を独立作成する
 import os
 import shutil
 import tempfile
@@ -25,8 +28,19 @@ class FileManager:
         # GitRepositoryManagerを初期化
         self.git_manager = GitRepositoryManager()
         
-        # フォルダ設定ファイルのパス
-        self.settings_file = Path.home() / ".techzip" / "folder_settings.json"
+        # フォルダ設定ファイルのパス（ConfigManagerから取得、フォールバック付き）
+        try:
+            settings_path_str = self.config.get('paths.settings_file')
+            if settings_path_str:
+                self.settings_file = Path(settings_path_str)
+                self.logger.info(f"ConfigManagerから設定ファイルパスを取得: {self.settings_file}")
+            else:
+                # 設定が空の場合はデフォルト値
+                self.settings_file = Path.home() / ".techzip" / "folder_settings.json"
+                self.logger.info("ConfigManagerの設定が空のため、デフォルト設定ファイルパスを使用")
+        except Exception as e:
+            self.logger.warning(f"ConfigManagerからの設定取得に失敗: {e}")
+            self.settings_file = Path.home() / ".techzip" / "folder_settings.json"
     
     def find_repository_folder(self, repo_name: str, prefer_remote: bool = True) -> Optional[Path]:
         """
@@ -86,6 +100,17 @@ class FileManager:
         self.logger.info(f"作業フォルダ検索開始: {repo_path}")
         
         required_files = {'config.yml', 'catalog.yml'}
+        
+        # まずReVIEWフォルダを優先検索
+        review_folder = repo_path / "ReVIEW"
+        if review_folder.exists() and review_folder.is_dir():
+            self.logger.info(f"ReVIEWフォルダを発見: {review_folder}")
+            if self._check_work_folder(review_folder, required_files):
+                self.logger.info(f"ReVIEWフォルダが作業フォルダとして有効: {review_folder}")
+                return review_folder
+            else:
+                self.logger.info(f"ReVIEWフォルダは作業フォルダではないが、候補として返却: {review_folder}")
+                return review_folder
         
         # リポジトリ直下をチェック
         if self._check_work_folder(repo_path, required_files):
@@ -264,3 +289,5 @@ class FileManager:
     def __del__(self):
         """デストラクタ"""
         self.cleanup_temp_files()
+
+# ConfigManager 分離済み - core/config_manager.py として作成済み

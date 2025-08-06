@@ -1,4 +1,5 @@
-﻿"""GitHubリポジトリ管理モジュール"""
+from __future__ import annotations
+"""GitHubリポジトリ管理モジュール"""
 import os
 import shutil
 import tempfile
@@ -10,17 +11,30 @@ from urllib.parse import urlparse
 from utils.logger import get_logger
 from utils.config import get_config
 
+# ConfigManagerをインポート
+try:
+    from src.slack_pdf_poster import ConfigManager
+except ImportError:
+    ConfigManager = None
+
 
 class GitRepositoryManager:
     """GitHubリポジトリのクローンとキャッシュ管理を行うクラス"""
     
-    def __init__(self):
+    def __init__(self, config_manager: Optional['ConfigManager'] = None):
         """GitRepositoryManagerを初期化"""
         self.logger = get_logger(__name__)
         self.config = get_config()
+        self.config_manager = config_manager or (ConfigManager() if ConfigManager else None)
         
-        # キャッシュディレクトリの設定
-        self.cache_dir = Path.home() / ".techzip" / "repo_cache"
+        # キャッシュディレクトリの設定（ConfigManagerから取得）
+        if self.config_manager:
+            cache_base = self.config_manager.get("paths.cache_directory", str(Path.home() / ".techzip"))
+        else:
+            cache_base = str(Path.home() / ".techzip")
+            self.logger.warning("ConfigManagerが利用できません。デフォルトキャッシュパスを使用します。")
+        
+        self.cache_dir = Path(cache_base) / "repo_cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         # GitHub設定の読み込み
@@ -89,7 +103,7 @@ class GitRepositoryManager:
         """
         # 既存のディレクトリがある場合は削除
         if target_path.exists():
-            shutil.rmtree(target_path)
+            self._safe_remove_directory(target_path)
         
         # GitHub URLの構築
         if self.github_token:
@@ -111,7 +125,7 @@ class GitRepositoryManager:
                 ["git", "clone", clone_url, str(target_path)],
                 capture_output=True,
                 text=True,
-                timeout=300  # 5分のタイムアウト
+                timeout=self.config_manager.get("api.git.clone_timeout", 300) if self.config_manager else 300  # ConfigManagerからタイムアウト取得
             )
             
             if result.returncode == 0:
@@ -147,7 +161,7 @@ class GitRepositoryManager:
                 cwd=repo_path,
                 capture_output=True,
                 text=True,
-                timeout=120  # 2分のタイムアウト
+                timeout=self.config_manager.get("api.git.pull_timeout", 120) if self.config_manager else 120  # ConfigManagerからタイムアウト取得
             )
             
             if result.returncode == 0:
@@ -203,13 +217,13 @@ class GitRepositoryManager:
         if repo_name:
             cache_path = self.cache_dir / repo_name
             if cache_path.exists():
-                shutil.rmtree(cache_path)
+                self._safe_remove_directory(cache_path)
                 self.logger.info(f"キャッシュクリア: {repo_name}")
         else:
             # 全キャッシュクリア
             for item in self.cache_dir.iterdir():
                 if item.is_dir():
-                    shutil.rmtree(item)
+                    self._safe_remove_directory(item)
             self.logger.info("全キャッシュをクリアしました")
     
     def get_cache_info(self) -> Dict[str, Any]:
@@ -238,3 +252,50 @@ class GitRepositoryManager:
         info['repository_count'] = len(info['repositories'])
         
         return info
+    
+    def _safe_remove_directory(self, path: Path):
+        """
+        Windows対応の安全なディレクトリ削除
+        
+        Args:
+            path: 削除対象のパス
+        """
+        import stat
+        import time
+        
+        try:
+            # Windowsでの権限問題を回避するため、読み取り専用属性を解除
+            def remove_readonly(func, path, exc_info):
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+            
+            # 最初の試行
+            shutil.rmtree(path, onerror=remove_readonly)
+            self.logger.debug(f"ディレクトリ削除成功: {path}")
+            
+        except PermissionError as e:
+            self.logger.warning(f"ディレクトリ削除で権限エラー、リトライ中: {e}")
+            
+            # リトライ前に少し待機
+            time.sleep(0.5)
+            
+            try:
+                # Git関連ファイルの権限を修正してからリトライ
+                for root, dirs, files in os.walk(path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        try:
+                            os.chmod(file_path, stat.S_IWRITE)
+                        except:
+                            pass
+                
+                shutil.rmtree(path, onerror=remove_readonly)
+                self.logger.info(f"ディレクトリ削除成功（リトライ後）: {path}")
+                
+            except Exception as retry_error:
+                self.logger.error(f"ディレクトリ削除最終的に失敗: {retry_error}")
+                # ディレクトリ削除に失敗してもプロセスは継続
+                
+        except Exception as e:
+            self.logger.error(f"ディレクトリ削除中に予期しないエラー: {e}")
+            # ディレクトリ削除に失敗してもプロセスは継続

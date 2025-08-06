@@ -1,4 +1,5 @@
-﻿"""Input validation module"""
+from __future__ import annotations
+"""Input validation module"""
 import re
 from pathlib import Path
 from typing import List, Tuple, Optional

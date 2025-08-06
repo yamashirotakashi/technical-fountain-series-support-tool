@@ -1,238 +1,164 @@
-# グローバルルールの継承
-@../CLAUDE.md
+# 技術の泉シリーズ制作支援ツール (TECHZIP) v1.8
 
-# プロジェクト名: 技術の泉シリーズ制作支援ツール
-最終更新: 2025-01-08
+## 🚨 次回セッション最優先タスク
 
-## 🎯 プロジェクト概要
-- **目的**: 技術の泉シリーズの制作プロセスを自動化・効率化
-- **主要機能**: Re:VIEW形式から超原稿用紙（Word）形式への自動変換と配置
-- **プロジェクトキーワード**: `[techzip]`
+**必ず最初に確認**: [docs/README.md](./docs/README.md)
 
-## 📋 ワークフロー
-1. **Nコード入力** - 処理対象のNコードを指定（カンマ、タブ、スペース、改行区切り対応）
-2. **Googleシート検索** - Nコードからリポジトリ名を取得
-3. **リポジトリ検索** - Google Drive内のリポジトリフォルダを特定
-4. **ZIP作成** - Re:VIEWフォルダをZIP化
-5. **アップロード** - 変換サービスにZIPをアップロード
-6. **メール監視** - 変換完了メールを自動監視
-7. **ダウンロード** - 変換済みファイルを取得
-8. **Word処理** - 1行目を削除して整形
-9. **ファイル配置** - 指定フォルダに最終成果物を配置
+次回セッションは、docs/README.mdに記載されている内容から開始すること。
+特に以下を確認：
+1. 既知の問題リスト（[docs/KNOWN_ISSUES.md](./docs/KNOWN_ISSUES.md)）
+2. 次回作業内容の指示
+3. 優先度の高いバグフィックス
 
-## 🚀 起動方法
+**重要**: 今後のタスク更新や問題報告は、docs/README.mdに記載すること。
 
-### WSL環境
+## 📋 プロジェクト概要
+**現行バージョン**: 1.8 (Windows EXE Build Complete)  
+**技術スタック**: Python 3.13+ | PyQt6 | Dependency Injection | 統一設定管理  
+**エントリーポイント**: `main.py` (唯一の現行エントリーポイント)  
+**実行形態**: スタンドアロンWindows EXE (`TECHZIP.1.8.exe`)
+
+## 🏗️ モダンアーキテクチャ (Phase 3-2完了)
+
+### DIコンテナシステム
+```python
+# core/di_container.py - ServiceContainer実装
+- register_singleton(): 単一インスタンス管理
+- register_transient(): 都度新規インスタンス
+- register_scoped(): スコープ付きライフタイム
+- @inject デコレーター: 宣言的依存注入
+```
+
+### 統一設定管理
+```python
+# core/configuration_provider.py - ConfigurationProvider
+- 全サービス設定の一元管理
+- 環境変数との自動統合
+- デフォルト値の適切な管理
+- DIコンテナとの完全統合
+```
+
+### Qt6完全移行 (PyQt5から完全移行済み)
+- PyQt6ベースのモダンGUIフレームワーク
+- レスポンシブデザインとシグナル/スロット最新化
+- main_window.py, settings_dialog.py等、全GUI層をQt6で統一
+
+## 🚀 実行環境
+
+### 開発環境
 ```bash
+# WSL/Linux
 cd /mnt/c/Users/tky99/dev/technical-fountain-series-support-tool
 source venv/bin/activate
 python main.py
-```
 
-### Windows PowerShell（推奨）
-```powershell
+# Windows PowerShell
 cd C:\Users\tky99\DEV\technical-fountain-series-support-tool
 .\run_windows.ps1
 ```
 
-### ホットキー起動（Ctrl+Shift+I）
+### 本番環境 (Windows EXE v1.8)
+```bash
+# スタンドアロン実行
+.\dist\TECHZIP.1.8\TECHZIP.1.8.exe
 
-#### PowerShell内でのホットキー
-```powershell
-# 永続的な設定（PowerShellプロファイルに追加）
-.\setup_hotkey.ps1
-
-# 一時的な設定（現在のセッションのみ）
-.\hotkey_quick_launch.ps1
-
-# 設定を削除する場合
-.\remove_hotkey.ps1
+# グローバルホットキー
+Ctrl+Shift+I  # アプリケーション起動
 ```
 
-#### システム全体のグローバルホットキー（推奨）
-PowerShellが起動していなくても使用可能：
+## 🔧 主要実装機能 (v1.8)
 
-##### スタートアップ登録方式（narouと同じ方式）
-```batch
-# インストール（Windows起動時に自動有効化）
-install_startup.bat
+### コアワークフロー
+- **Nコード処理**: 複数形式入力対応（カンマ、タブ、改行区切り）
+- **Google Sheets連携**: OAuth2認証によるAPIアクセス
+- **Re:VIEW ZIP変換**: 自動変換・監視システム
+- **Gmail監視**: OAuth2によるリアルタイム通知検出
+- **Word処理**: 1行目削除・整形処理（DI統合対応）
+- **NextPublishing連携**: 文字化け(mojibake)対策実装済み
 
-# アンインストール
-uninstall_startup.bat
-```
+### 技術的特徴
+- **DIコンテナ**: Service Locatorアンチパターン除去済み
+- **設定統合**: ConfigurationProviderによる一元管理
+- **認証統合**: Gmail/Google Sheets OAuth2完全対応
+- **エラーハンドリング**: 各層での適切な例外処理
+- **ログ管理**: utils/logger.pyによる統一ログ出力
 
-##### 手動実行方式
-```batch
-# AutoHotkeyを使用した一時的な設定
-test_hotkey_direct.bat
-```
-※要AutoHotkeyインストール
-
-## 🔧 設定ファイル
-
-### config/settings.json
-```json
-{
-    "google_sheet": {
-        "sheet_id": "17DKsMGQ6krbhY7GIcX0iaeN-y8HcGGVkXt3d4oOckyQ",
-        "credentials_path": "C:\\Users\\tky99\\dev\\techbookanalytics\\config\\techbook-analytics-aa03914c6639.json"
-    },
-    "paths": {
-        "git_base": "G:\\マイドライブ\\[git]",
-        "output_base": "G:\\.shortcut-targets-by-id\\0B6euJ_grVeOeMnJLU1IyUWgxeWM\\NP-IRD"
-    }
-}
-```
-
-### .env（要作成）
-```
-GMAIL_ADDRESS=yamashiro.takashi@gmail.com
-GMAIL_APP_PASSWORD=your_app_password_here
-```
-
-## ⚠️ 前提条件
-
-### Google Cloud設定
-1. **Google Sheets API** - 有効化が必要
-2. **サービスアカウント** - `techbook-analyzer-local-dev@techbook-analytics.iam.gserviceaccount.com`
-3. **シート共有** - サービスアカウントにGoogleシートの閲覧権限付与が必要
-
-### Gmail設定
-- **アプリパスワード** - 2段階認証を有効にしてアプリパスワードを生成
-- **IMAP有効化** - Gmail設定でIMAPを有効にする
-
-## 🛠️ トラブルシューティング
-
-### Google Sheets APIエラー
-```
-"Google Sheets API has not been used in project..."
-```
-→ Google Cloud ConsoleでSheets APIを有効化
+## 📁 プロジェクト構造
 
 ```
-"The caller does not have permission"
-```
-→ Googleシートをサービスアカウントと共有
-
-### メール監視エラー
-```
-"'ascii' codec can't encode characters..."
-```
-→ 修正済み。日本語件名の検索に対応
-
-## 📝 既知の問題と対応状況
-- ✅ Google Sheets API認証設定
-- ✅ 日本語メール件名のエンコーディング対応
-- ⏳ メール到着まで最大20分待機が必要
-
-## 🔄 開発メモ
-- PyQt5使用（WSL互換性のため）
-- 環境変数からの認証情報取得対応
-- UTF-8エンコーディング対応済み
-
-## 🚧 実装済み機能
-### リモートリポジトリ対応（2025-01-19実装）
-- **優先順位**: GitHubユーザー`irdtechbook`のリモートリポジトリから優先取得
-- **フォールバック**: リモート取得失敗時はローカルGoogle Drive（`G:\マイドライブ\[git]`）から取得
-- **実装内容**: 
-  1. GitRepositoryManagerクラスによるGitHub連携
-  2. ローカルキャッシュ機能（`~/.techzip/repo_cache`）
-  3. GUIからのリポジトリ設定管理（ツール→リポジトリ設定）
-  4. 環境変数`GITHUB_TOKEN`によるプライベートリポジトリ対応
-
-## 🎯 次期開発計画（2025-07-30更新）
-
-### 🎉 CodeBlockOverFlowDisposal開発ロードマップ
-**Phase1完了済み（2025-07-30）**: 
-- OCRベース右端はみ出し検出システム実装完了
-- Windows EXE化対応完了
-- PyQt6独立アプリケーション完成
-
-### 📋 Phase2: 機械学習機能の充実（次期開発）
-**目標**: より高精度で汎用的な溢れ検出システムの構築
-
-**実装項目**:
-1. **高度な溢れパターン学習システム**
-   - ユーザー判定データからの継続学習機能
-   - 複数のPDFレイアウトパターンへの対応
-   - 検出精度の自動改善メカニズム
-
-2. **機械学習ベースの検出エンジン**
-   - テキスト配置パターンの学習
-   - フォント・レイアウト特徴の自動抽出
-   - 偽陽性・偽陰性の学習による精度向上
-
-3. **インテリジェント判定支援**
-   - 検出結果の信頼度表示
-   - 学習データに基づく推奨アクション
-   - ユーザー習慣の学習と提案
-
-**推定工数**: 15-20時間
-
-### 🔗 Phase3: TECHZIP支援アプリへの統合
-**目標**: Re:VIEW→Word変換ワークフローへの自動品質チェック統合
-
-**統合内容**:
-1. **PDF後処理フックとしての統合**
-   - Word変換完了後の自動溢れチェック実行
-   - 変換品質レポートの自動生成
-   - 問題検出時の修正推奨機能
-
-2. **TECHZIP GUIへの統合**
-   - 品質チェックタブの追加
-   - 一括処理時の自動チェック機能
-   - 履歴管理とトレンド分析
-
-3. **ワークフロー最適化**
-   - 設定ファイル統合（settings.json拡張）
-   - バッチ処理対応
-   - ログ統合とレポート機能
-
-**推定工数**: 12-18時間
-
-### Phase 3: Slack統合（延期）
-- PDF生成完了後の自動Slack投稿機能
-- 新規にSlack Bot作成（PDF投稿機能）
-- 「完了後Slackに投稿」オプション追加
-- 詳細: `/docs/TECHZIP_DEVELOPMENT_ROADMAP.md`
-
-### Phase 4: TechZip Admin（延期）
-- プロジェクト初期化専用の管理者ツール（別アプリ）
-- Slack/GitHubリソースの一括作成
-- 高権限操作の安全な実行
-- 詳細: `/docs/project_initialization_automation_research.md`
-
-## 🚨 次回セッション必須タスク（2025-01-08追加）
-
-### 1. 【最優先】TECHZIP1.8 Windows EXE Build & Test (TECHZIP-BUILD-001)
-**状況**: Build script作成完了、ディレクトリ修正済み
-**実行場所**: `C:\Users\tky99\DEV\technical-fountain-series-support-tool\dist\`
-**緊急度**: 🔴 Critical - 即座実行必須
-
-**Phase 1: EXE Build実行**:
-```powershell
-cd C:\Users\tky99\DEV\technical-fountain-series-support-tool\dist
-.\build_techzip18_folder.ps1
+technical-fountain-series-support-tool/
+├── main.py                    # 唯一の現行エントリーポイント
+├── core/                      # コアビジネスロジック層
+│   ├── di_container.py        # DIコンテナ実装
+│   ├── configuration_provider.py # 統一設定管理
+│   ├── workflow_processor.py  # メインワークフロー制御
+│   ├── word_processor.py      # Word処理（DI統合済み）
+│   └── gmail_monitor.py       # Gmail OAuth監視
+├── gui/                       # PyQt6 GUI層
+│   ├── main_window.py         # メインウィンドウ
+│   └── settings_dialog.py     # 設定ダイアログ
+├── services/                  # 外部サービス連携層
+│   └── nextpublishing_service.py # NextPublishing（mojibake対応）
+├── app/modules/               # スタンドアロンアプリ
+│   └── CodeBlockOverFlowDisposal/ # PDF溢れ検出システム
+├── dist/TECHZIP.1.8/         # Windows EXE配布物
+│   └── TECHZIP.1.8.exe       # 実行ファイル
+└── archive/                   # Legacy Code Archive
+    ├── legacy_entry_points/   # 旧main*.pyファイル群
+    ├── legacy_gui/           # 旧GUI実装
+    └── documentation/        # 復旧手順書
 ```
 
-**Phase 2: 機能検証**:
-- [x] ビルドスクリプト作成（完了）
-- [x] ディレクトリパス修正（完了）
-- [ ] PyInstaller実行とEXE生成
-- [ ] GUI起動テスト
-- [ ] API設定画面動作確認（2列レイアウト）
-- [ ] ConfigManager統合動作確認
-- [ ] 全機能動作テスト
+## 🔄 Legacy Code アーカイブ状況
 
-**Phase 3: 配布準備**:
-- [ ] README.txt作成（自動）
-- [ ] 動作確認レポート作成
-- [ ] バージョン1.8の新機能動作確認
+### アーカイブ済みファイル
+- **旧エントリーポイント**: main_gui.py, main_clean.py, main_no_google.py, main_qt6.py
+- **旧GUI実装**: main_window_qt6.py, main_window_refactored.py等
+- **移行ツール**: migrate_to_qt6_properly.ps1, convert_to_qt6.ps1等
 
-**実装済み内容**:
-- ✅ ConfigManager class統合
-- ✅ API設定画面2列レイアウト
-- ✅ 全API設定項目デフォルト値適用
-- ✅ パスワードマスク除去
-- ✅ Python 3.13.5完全対応
-- ✅ ビルドスクリプト作成・修正完了
+### 現行システム
+- **エントリーポイント**: `main.py`のみ
+- **GUI実装**: PyQt6統一実装
+- **アーキテクチャ**: DIコンテナ + 統一設定管理
+
+## 🛡️ 品質保証
+
+### 実装済み修正
+- ✅ WordProcessor DI統合問題の根本解決
+- ✅ NextPublishing文字化け完全対策
+- ✅ Gmail OAuth2認証の安定化
+- ✅ Service Locatorアンチパターンの完全除去
+
+### 監視中の課題
+- Gmail到着通知の最大20分遅延（Gmail API制限）
+- 大容量ZIPアップロード時のタイムアウト
+
+## 📈 次期開発計画 (Phase 4)
+
+### 拡張機能
+1. **Slack統合強化**: PDF自動投稿、進捗通知
+2. **機械学習統合**: CodeBlockOverFlowDisposal ML版
+3. **クラウド対応**: AWS Lambda デプロイメント
+
+### 技術改善
+- DIパフォーマンス最適化（目標: <1ms per resolution）
+- メモリ管理の最適化
+- 循環依存の自動検出強化
+
+## 🔍 開発ガイドライン
+
+### コーディング規約
+- 新サービスは必ずDIコンテナに登録
+- 設定アクセスはConfigurationProvider経由のみ
+- ログ出力はutils/logger.py使用必須
+- @injectデコレーターによる宣言的依存注入
+
+### テスト方針
+- ユニットテスト: サービス個別検証
+- 統合テスト: DI統合の健全性確認
+- E2Eテスト: ワークフロー全体動作確認
+
+---
+
+**重要**: legacy codeは全てarchive/配下に移動済み。現行開発では`main.py`のみを使用してください。  
+**復旧**: 必要時は`archive/documentation/RECOVERY_INSTRUCTIONS.md`を参照

@@ -5,6 +5,7 @@ from typing import List, Dict, Tuple, Optional
 
 class PreflightVerifier(ABC):
     """Pre-flight検証の抽象基底クラス
+from __future__ import annotations
     
     Strategy Patternで実装方式を切り替え可能にする
     """

@@ -13,6 +13,7 @@ from utils.logger import get_logger
 
 class PreflightWorker(QThread):
     """Pre-flight Check処理用ワーカースレッド"""
+from __future__ import annotations
     
     # シグナル
     file_checked = pyqtSignal(str, bool, str)  # filename, is_error, message

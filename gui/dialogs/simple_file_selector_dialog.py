@@ -1,4 +1,5 @@
-﻿"""シンプルなファイル選択ダイアログ"""
+from __future__ import annotations
+"""シンプルなファイル選択ダイアログ"""
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, 
     QCheckBox, QPushButton, QLabel, QScrollArea, QWidget

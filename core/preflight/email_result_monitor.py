@@ -1,4 +1,6 @@
 """Pre-flight Check結果メール監視モジュール"""
+from __future__ import annotations
+
 import re
 import time
 from typing import Dict, List, Tuple, Optional
@@ -8,28 +10,41 @@ import email
 from core.email_monitor import EmailMonitor
 from utils.logger import get_logger
 
+# ConfigManagerのインポート（try-except ImportErrorパターン）
+try:
+    from .config_manager import ConfigManager
+except ImportError:
+    ConfigManager = None
+
 
 class PreflightEmailResultMonitor(EmailMonitor):
     """Pre-flight Check用のメール監視クラス"""
     
-    def __init__(self, email_address: str, password: str):
+    def __init__(self, email_address: str, password: str, config_manager: Optional['ConfigManager'] = None):
         super().__init__(email_address, password)
         self.logger = get_logger(__name__)
+        self.config_manager = config_manager
         
-    def wait_for_results(self, job_ids: List[str], timeout: int = 2400, 
-                        check_interval: int = 30) -> Dict[str, Tuple[str, Optional[str]]]:
+    def wait_for_results(self, job_ids: List[str], timeout: Optional[int] = None, 
+                        check_interval: Optional[int] = None) -> Dict[str, Tuple[str, Optional[str]]]:
         """
         複数のジョブ結果メールを待機
         
         Args:
             job_ids: 監視対象のジョブIDリスト
-            timeout: 全体のタイムアウト時間（秒）デフォルト40分
+            timeout: 全体のタイムアウト時間（秒）
             check_interval: チェック間隔（秒）
             
         Returns:
             {job_id: (status, error_message)} の辞書
             status: "success", "error", "timeout"
         """
+        # ConfigManagerから設定値を取得（デフォルト値付き）
+        if timeout is None:
+            timeout = self.config_manager.get("email.result_monitor.timeout", 2400) if self.config_manager else 2400
+        if check_interval is None:
+            check_interval = self.config_manager.get("email.result_monitor.check_interval", 30) if self.config_manager else 30
+            
         if not self.connection:
             self.connect()
             

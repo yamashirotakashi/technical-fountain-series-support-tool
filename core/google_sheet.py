@@ -1,4 +1,5 @@
-﻿"""Google Sheets連携モジュール"""
+from __future__ import annotations
+"""Google Sheets連携モジュール"""
 import os
 import time
 import random

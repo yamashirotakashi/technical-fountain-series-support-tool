@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 繝・ヰ繝・げ繝ｭ繧ｰ繝ｬ繝吶Ν繧定ｨｭ螳壹☆繧九せ繧ｯ繝ｪ繝励ヨ
 """

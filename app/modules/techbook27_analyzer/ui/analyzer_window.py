@@ -367,14 +367,14 @@ Word文書（.docx）の先頭行を削除します。
             self.show_error("入力エラー", "最大画素数は1〜10000の数値で入力してください")
             return
             
-        # 処理オプションを作成
+        # 処理オプションを作成（安全にアクセス）
         options = ProcessingOptions(
-            remove_profile=self.image_options['remove_profile'].isChecked(),
-            grayscale=self.image_options['grayscale'].isChecked(),
-            change_resolution=self.image_options['change_resolution'].isChecked(),
-            resize=self.image_options['resize'].isChecked(),
-            backup=self.image_options['backup'].isChecked(),
-            png_to_jpg=self.image_options['png_to_jpg'].isChecked(),
+            remove_profile=self.image_options.get('remove_profile', QCheckBox()).isChecked() if 'remove_profile' in self.image_options else False,
+            grayscale=self.image_options.get('grayscale', QCheckBox()).isChecked() if 'grayscale' in self.image_options else False,
+            change_resolution=self.image_options.get('change_resolution', QCheckBox()).isChecked() if 'change_resolution' in self.image_options else True,
+            resize=self.image_options.get('resize', QCheckBox()).isChecked() if 'resize' in self.image_options else True,
+            backup=self.image_options.get('backup', QCheckBox()).isChecked() if 'backup' in self.image_options else True,
+            png_to_jpg=self.image_options.get('png_to_jpg', QCheckBox()).isChecked() if 'png_to_jpg' in self.image_options else True,
             max_pixels=str(max_pixels),
             resolution=resolution
         )

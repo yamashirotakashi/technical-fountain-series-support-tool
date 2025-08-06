@@ -1,4 +1,5 @@
 """プログレスバーパネルモジュール"""
+from __future__ import annotations
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QProgressBar, QLabel, QHBoxLayout
 from PyQt6.QtCore import Qt, pyqtSlot
 

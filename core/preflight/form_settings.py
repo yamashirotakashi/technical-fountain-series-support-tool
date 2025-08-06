@@ -1,4 +1,6 @@
 """Word2XHTML5フォーム設定管理モジュール"""
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Optional
 import os

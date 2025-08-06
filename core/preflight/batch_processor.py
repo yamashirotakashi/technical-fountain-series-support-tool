@@ -1,4 +1,6 @@
 """Pre-flight Checkバッチ処理管理モジュール"""
+from __future__ import annotations
+
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional, Callable
 from dataclasses import dataclass
@@ -13,6 +15,12 @@ from .email_result_monitor import PreflightEmailResultMonitor
 from .state_manager import PreflightStateManager
 from .verifier_factory import VerifierFactory
 from utils.logger import get_logger
+
+# ConfigManagerをインポート
+try:
+    from src.slack_pdf_poster import ConfigManager
+except ImportError:
+    ConfigManager = None
 
 
 @dataclass
@@ -29,12 +37,14 @@ class BatchJob:
 class BatchProcessor:
     """Pre-flight Checkのバッチ処理を管理"""
     
-    def __init__(self, verifier: Optional[PreflightVerifier] = None):
+    def __init__(self, verifier: Optional[PreflightVerifier] = None, config_manager: Optional['ConfigManager'] = None):
         """
         Args:
             verifier: 使用するVerifier（Noneの場合はファクトリーから生成）
+            config_manager: 設定管理インスタンス
         """
         self.logger = get_logger(__name__)
+        self.config_manager = config_manager or (ConfigManager() if ConfigManager else None)
         self.verifier = verifier or VerifierFactory.create_verifier()
         self.state_manager = PreflightStateManager()
         self.jobs: Dict[str, BatchJob] = {}
@@ -152,9 +162,12 @@ class BatchProcessor:
             # ジョブIDのリストを作成
             job_ids = [job.job_id for job in uploaded_jobs if job.job_id]
             
-            # メール結果を待機（最大40分）
-            self.logger.info("メール結果を待機中...")
-            results = email_monitor.wait_for_results(job_ids, timeout=2400, check_interval=30)
+            # メール結果を待機（ConfigManagerからタイムアウト設定を取得）
+            timeout = self.config_manager.get("email.max_wait_seconds", 2400) if self.config_manager else 2400  # デフォルト40分
+            check_interval = self.config_manager.get("email.check_interval", 30) if self.config_manager else 30  # デフォルト30秒
+            
+            self.logger.info(f"メール結果を待機中（最大{timeout//60}分、{check_interval}秒間隔）...")
+            results = email_monitor.wait_for_results(job_ids, timeout=timeout, check_interval=check_interval)
             
             # 結果を反映
             for job in uploaded_jobs:

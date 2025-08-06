@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 ReVIEW変換API 基本フロー動作確認テスト
 
@@ -19,9 +19,10 @@ import tempfile
 import re
 
 # API設定
-API_BASE_URL = "http://sd001.nextpublishing.jp/rapture"
-API_USERNAME = "ep_user"
-API_PASSWORD = "Nn7eUTX5"
+import os
+API_BASE_URL = os.getenv("NEXTPUB_API_BASE_URL", "http://sd001.nextpublishing.jp/rapture")
+API_USERNAME = os.getenv("NEXTPUB_USERNAME", "ep_user")
+API_PASSWORD = os.getenv("NEXTPUB_PASSWORD", "Nn7eUTX5")
 
 # テストファイル
 # 成功確認用（警告なし）

@@ -1,4 +1,5 @@
-﻿"""警告メッセージダイアログ"""
+from __future__ import annotations
+"""警告メッセージダイアログ"""
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTextEdit,
                              QLabel, QPushButton, QGroupBox, QStyle)
 from PyQt6.QtCore import Qt, pyqtSlot
